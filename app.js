@@ -1,15 +1,18 @@
-// ==================== 配置区（必须修改）====================
-const SUPABASE_URL = 'https://mronesaayjtjuhwvzouj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY';
+// 配置区（必须修改）
+const SUPABASE_URL = 'https://mronesaaytjjtuhwvzouj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheXRqanR1aHd2em91aiIsImlhdCI6MTc0NDk3NTY2MiwiZXhwIjoxOTYwNTUxNjYyfQ.8Z4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4';
 const ADMIN_PASSWORD = 'admin123';
 
-// ==================== 改用let，避免重复声明 ====================
+// 全局变量
 let supabase;
 let myId = null;
 let currentPrivateTarget = null;
 
-// ==================== 单例初始化（解决重复声明+存储拦截）====================
+// 初始化Supabase客户端（单例模式）
 if (!window.supabaseInstance) {
+  if (typeof window.supabase === 'undefined') {
+    alert('Supabase SDK加载失败，请检查CDN链接！');
+  }
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false }
   });
@@ -18,7 +21,7 @@ if (!window.supabaseInstance) {
   supabase = window.supabaseInstance;
 }
 
-// ==================== 登录函数（绑定到window，全局可访问）====================
+// 登录函数（绑定到window）
 window.enterRoom = async function() {
   const input = document.getElementById('playerId').value.trim();
   const errorEl = document.getElementById('loginError');
@@ -69,7 +72,7 @@ window.enterRoom = async function() {
   startListeners();
 }
 
-// ==================== 监听 ====================
+// 监听函数
 function startListeners() {
   supabase.channel('messages')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => loadMessages())
@@ -83,7 +86,7 @@ function startListeners() {
   loadPlayers();
 }
 
-// ==================== 加载消息 ====================
+// 加载消息
 async function loadMessages() {
   const { data: messages } = await supabase
     .from('messages')
@@ -127,7 +130,7 @@ async function loadMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-// ==================== 加载在线玩家 ====================
+// 加载在线玩家
 async function loadPlayers() {
   const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
   const { data: players } = await supabase
@@ -158,7 +161,7 @@ async function loadPlayers() {
   });
 }
 
-// ==================== 公屏发送 ====================
+// 公屏发送
 window.sendMessage = async function() {
   const input = document.getElementById('msgInput');
   const content = input.value.trim();
@@ -174,7 +177,7 @@ window.sendMessage = async function() {
   input.value = '';
 }
 
-// ==================== 私聊 ====================
+// 私聊
 window.openPrivate = function(targetId) {
   if (targetId === myId) {
     alert('不能给自己发私聊');
@@ -232,7 +235,7 @@ window.sendPrivate = async function() {
   loadPrivateMessages();
 }
 
-// ==================== 管理员 ====================
+// 管理员
 window.showAdmin = function() {
   const pwd = prompt('请输入房主密码：');
   if (pwd === ADMIN_PASSWORD) {
@@ -256,7 +259,7 @@ window.resetRoom = async function() {
   location.reload();
 }
 
-// ==================== 自动清理离线玩家 ====================
+// 自动清理离线玩家
 window.addEventListener('load', () => {
   setInterval(async () => {
     const expire = new Date(Date.now() - 30000).toISOString();

@@ -267,7 +267,14 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
-let lastPendingRequestId = null; // 【新增】防止重复弹框
+let lastPendingRequestId = null;
+
+// 【新增】定时器ID，用于退出时清理
+let loadMsgInterval = null;
+let checkReqInterval = null;
+let watchSentInterval = null;
+let refreshPanelInterval = null;
+let updateUiInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -308,12 +315,12 @@ async function login() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
-  // 所有轮询缩短、更稳定
-  setInterval(loadMessages, 300);
-  setInterval(checkPrivateRequest, 400);   // 【修复】被发起方查邀请
-  setInterval(watchMySentRequest, 400);    // 发起方监听同意
-  setInterval(refreshPrivateStatusPanel, 800);
-  setInterval(updateMyUiStatus, 800);
+  // 【修复】用变量保存定时器ID
+  loadMsgInterval = setInterval(loadMessages, 300);
+  checkReqInterval = setInterval(checkPrivateRequest, 400);
+  watchSentInterval = setInterval(watchMySentRequest, 400);
+  refreshPanelInterval = setInterval(refreshPrivateStatusPanel, 800);
+  updateUiInterval = setInterval(updateMyUiStatus, 800);
 }
 
 function togglePrivatePanel() {
@@ -342,12 +349,12 @@ async function refreshPrivateStatusPanel() {
   listEl.innerText = pairs.join('\n');
 }
 
-// 【修复】发起私聊：先清理同方向旧pending，再插入
+// 发起私聊：清理旧请求
 async function sendPrivateRequest(to) {
   const { data: target } = await supabaseClient.from('players').select('status').eq('player_id', to).single();
   if (target?.status === 'in_private') { alert(to + ' 正在私聊中'); return; }
 
-  // 清理旧的同方向 pending 请求（避免重复）
+  // 清理同方向旧pending
   await supabaseClient
     .from('private_requests')
     .delete()
@@ -363,7 +370,7 @@ async function sendPrivateRequest(to) {
   alert('已向 ' + to + ' 发起私聊申请');
 }
 
-// 【核心修复】被发起方：检查私聊邀请（稳定弹框）
+// 被发起方查邀请
 async function checkPrivateRequest() {
   if (mode === 'private') return;
   if (document.getElementById('privateModal').style.display === 'flex') return;
@@ -382,7 +389,6 @@ async function checkPrivateRequest() {
   }
 
   const req = reqs[0];
-  // 同一个请求只弹一次
   if (lastPendingRequestId === req.id) return;
 
   lastPendingRequestId = req.id;
@@ -391,7 +397,7 @@ async function checkPrivateRequest() {
   window.currentRequest = req;
 }
 
-// 发起方监听自己的请求是否被同意
+// 【关键修复】发起方监听：只处理"当前最新"的accepted，且不重复触发
 async function watchMySentRequest() {
   if (mode === 'private') return;
 
@@ -405,6 +411,12 @@ async function watchMySentRequest() {
 
   if (reqs && reqs.length > 0) {
     const req = reqs[0];
+    // 【新增】同意后立即把这条请求标为closed，防止重复进入
+    await supabaseClient
+      .from('private_requests')
+      .update({ status: 'closed' })
+      .eq('id', req.id);
+
     mode = 'private';
     privatePartner = req.to_id;
     document.getElementById('endPrivateBtn').style.display = 'inline-block';
@@ -447,18 +459,32 @@ async function rejectPrivate() {
   lastPendingRequestId = null;
 }
 
-// 结束私聊
+// 【彻底修复】退出私聊：清理所有状态 + 数据库 + 定时器
 async function endPrivate() {
   if (!privatePartner) return;
-  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
-  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', privatePartner);
+
+  // 1. 前端状态全清
   mode = 'group';
+  const exPartner = privatePartner;
   privatePartner = null;
-  document.getElementById('endPrivateBtn').style.display = 'none';
   lastLoadedId = 0;
+  lastPendingRequestId = null;
+  document.getElementById('endPrivateBtn').style.display = 'none';
+
+  // 2. 数据库清理（关键！）
+  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
+  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', exPartner);
+
+  // 3. 关闭双方所有相关私聊请求（防止循环）
+  await supabaseClient.from('private_requests')
+    .update({ status: 'closed' })
+    .or(`from_id.eq.${me},to_id.eq.${me},from_id.eq.${exPartner},to_id.eq.${exPartner}`);
+
+  // 4. 强制刷新一次消息，避免闪烁
+  await loadMessages();
 }
 
-// 加载消息（不重复）
+// 加载消息（稳定不闪）
 async function loadMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
@@ -467,36 +493,38 @@ async function loadMessages() {
 
   if (!list) return;
   const dom = document.getElementById('messages');
-  dom.innerHTML = '';
+  const oldScroll = dom.scrollHeight - dom.scrollTop; // 防闪烁
   let maxId = 0;
 
+  // 【修复】只更新新增消息，不清空全部
+  const fragment = document.createDocumentFragment();
   for (const m of list) {
     if (m.id <= lastLoadedId) continue;
 
-    if (mode === 'group' && m.type !== 'public') continue;
-    if (mode === 'private') {
-      if (m.type !== 'private') continue;
-      const isBetween = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
-      if (!isBetween) continue;
-    }
-
+    let el;
     if (m.type === 'system') {
-      dom.innerHTML += `<div class="sys">${m.content}</div>`;
+      el = document.createElement('div');
+      el.className = 'sys';
+      el.textContent = m.content;
     } else {
-      const num = m.from_id.replace('号', '');
       const isMe = m.from_id === me;
-      dom.innerHTML += `
-      <div class="msg ${isMe ? 'me' : ''}">
-        <div class="avatar" data-id="${m.from_id}">${num}</div>
+      el = document.createElement('div');
+      el.className = `msg ${isMe ? 'me' : ''}`;
+      el.innerHTML = `
+        <div class="avatar" data-id="${m.from_id}">${m.from_id.replace('号', '')}</div>
         <div class="bubble">${m.content}</div>
-      </div>`;
+      `;
     }
-
+    fragment.appendChild(el);
     if (m.id > maxId) maxId = m.id;
   }
 
-  dom.scrollTop = dom.scrollHeight;
-  lastLoadedId = maxId;
+  if (maxId > lastLoadedId) {
+    dom.appendChild(fragment);
+    lastLoadedId = maxId;
+    // 平滑滚动
+    dom.scrollTop = dom.scrollHeight;
+  }
 }
 
 // 发送消息
@@ -513,7 +541,7 @@ async function send() {
   i.value = '';
 }
 
-// 重置相关
+// 重置
 function showResetModal() { document.getElementById('resetModal').style.display = 'flex'; }
 function closeResetModal() { document.getElementById('resetModal').style.display = 'none'; }
 

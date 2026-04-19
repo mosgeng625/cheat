@@ -19,7 +19,7 @@
     margin: 0 auto;
   }
 
-  /* ========== 登录界面 ========== */
+  /* 登录界面 */
   #login {
     height: 100vh;
     display: flex;
@@ -80,7 +80,7 @@
     margin-top: 12px;
   }
 
-  /* ========== 主界面 ========== */
+  /* 主界面 */
   #app {
     display: none;
     height: 100vh;
@@ -151,6 +151,7 @@
     max-width: 70%;
   }
 
+  /* 头像：修复点击 */
   .avatar {
     width: 36px;
     height: 36px;
@@ -163,6 +164,10 @@
     font-weight: bold;
     flex-shrink: 0;
     cursor: pointer;
+    /* 确保可点击 */
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10;
   }
 
   .msg-other .bubble {
@@ -376,21 +381,31 @@ async function enterRoom() {
     content: myId + ' 进入了房间'
   });
 
-  // 启动自动刷新
+  // 统一用事件委托（修复头像点击）
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const avatarEl = e.target.closest('.avatar');
+    if (!avatarEl) return;
+    const fromId = avatarEl.dataset.fromId;
+    if (!fromId || fromId === myId) return;
+    sendPrivateRequest(fromId);
+  });
+
   setInterval(loadMessages, 600);
   setInterval(checkPrivateRequests, 1000);
   setInterval(updateOnlineStatus, 2000);
 }
 
-// 更新在线状态显示
+// 更新在线状态
 async function updateOnlineStatus() {
   const { data: players } = await supabaseClient
-    .from('players').select('*').neq('player_id', myId).eq('status', 'in_private');
+    .from('players').select('*').eq('status', 'in_private');
 
+  const statusEl = document.getElementById('statusText');
   if (players && players.length > 0) {
-    document.getElementById('statusText').innerText = `${players[0].player_id} 正在私聊`;
+    const pair = players.map(p => p.player_id).join(' & ');
+    statusEl.innerText = `私聊中：${pair}`;
   } else {
-    document.getElementById('statusText').innerText = currentMode === "group" ? "群聊模式" : `私聊模式：和${privatePartner}`;
+    statusEl.innerText = currentMode === "group" ? "群聊模式" : `私聊：${privatePartner}`;
   }
 }
 
@@ -410,12 +425,11 @@ async function checkPrivateRequests() {
 async function sendPrivateRequest(toId) {
   if (toId === myId) return;
 
-  // 检查对方是否正在私聊
   const { data: target } = await supabaseClient
     .from('players').select('*').eq('player_id', toId).single();
 
-  if (target.status === "in_private") {
-    alert(`${toId} 正在私聊中，暂时无法发起申请`);
+  if (target?.status === "in_private") {
+    alert(`${toId} 正在私聊中`);
     return;
   }
 
@@ -425,39 +439,35 @@ async function sendPrivateRequest(toId) {
     status: 'pending'
   });
 
-  alert(`已向 ${toId} 发起私聊申请，等待对方同意`);
+  alert(`已向 ${toId} 发起私聊申请`);
 }
 
-// 同意私聊申请
+// 同意私聊
 async function acceptPrivateRequest() {
   if (!pendingPrivateRequestFrom) return;
 
-  // 更新双方状态
   await supabaseClient.from('players').update({ status: "in_private" }).eq('player_id', myId);
   await supabaseClient.from('players').update({ status: "in_private" }).eq('player_id', pendingPrivateRequestFrom);
 
-  // 更新私聊请求状态
   await supabaseClient.from('private_requests').update({ status: 'accepted' })
     .eq('from_id', pendingPrivateRequestFrom).eq('to_id', myId);
 
-  // 进入私聊模式
   currentMode = "private";
   privatePartner = pendingPrivateRequestFrom;
-  document.getElementById('statusText').innerText = `私聊模式：和${privatePartner}`;
   document.getElementById('endPrivateBtn').style.display = 'block';
 
   await supabaseClient.from('messages').insert({
     type: 'system',
     from_id: 'system',
     to_id: 'all',
-    content: `${myId} 和 ${privatePartner} 进入了私聊`
+    content: `${myId} ↔ ${privatePartner} 开始私聊`
   });
 
   document.getElementById('privateRequestModal').style.display = 'none';
   pendingPrivateRequestFrom = null;
 }
 
-// 拒绝私聊申请
+// 拒绝私聊
 async function rejectPrivateRequest() {
   if (!pendingPrivateRequestFrom) return;
 
@@ -479,16 +489,15 @@ async function endPrivateChat() {
     type: 'system',
     from_id: 'system',
     to_id: 'all',
-    content: `${myId} 和 ${privatePartner} 结束了私聊`
+    content: `${myId} ↔ ${privatePartner} 结束私聊`
   });
 
   currentMode = "group";
   privatePartner = null;
-  document.getElementById('statusText').innerText = "群聊模式";
   document.getElementById('endPrivateBtn').style.display = 'none';
 }
 
-// 加载消息
+// 加载消息（修复头像 data-from-id）
 async function loadMessages() {
   const { data: msgList } = await supabaseClient
     .from('messages').select('*').order('created_at', { ascending: true });
@@ -499,7 +508,7 @@ async function loadMessages() {
   msgList.forEach(m => {
     if (currentMode === "group" && m.type === "private") return;
     if (currentMode === "private" && m.type === "public") return;
-    if (currentMode === "private" && m.type === "private" && 
+    if (currentMode === "private" && m.type === "private" &&
         m.from_id !== myId && m.from_id !== privatePartner) return;
 
     if (m.type === 'system') {
@@ -511,30 +520,21 @@ async function loadMessages() {
 
     if (m.from_id === myId) {
       html += `
-        <div class="msg-me">
-          <div class="avatar" onclick="handleAvatarClick('${m.from_id}')">${numText}</div>
-          <div class="bubble">${m.content}</div>
-        </div>
-      `;
+      <div class="msg-me">
+        <div class="avatar" data-from-id="${m.from_id}">${numText}</div>
+        <div class="bubble">${m.content}</div>
+      </div>`;
     } else {
       html += `
-        <div class="msg-other">
-          <div class="avatar" onclick="handleAvatarClick('${m.from_id}')">${numText}</div>
-          <div class="bubble">${m.content}</div>
-        </div>
-      `;
+      <div class="msg-other">
+        <div class="avatar" data-from-id="${m.from_id}">${numText}</div>
+        <div class="bubble">${m.content}</div>
+      </div>`;
     }
   });
 
   dom.innerHTML = html;
   dom.scrollTop = dom.scrollHeight;
-}
-
-// 头像点击事件
-function handleAvatarClick(fromId) {
-  if (currentMode === "private") return;
-  if (fromId === myId) return;
-  sendPrivateRequest(fromId);
 }
 
 // 发送消息
@@ -572,7 +572,7 @@ async function confirmReset() {
     alert('密码错误');
     return;
   }
-  if (!confirm('确定重置房间？所有聊天记录将被清空')) return;
+  if (!confirm('确定重置房间？')) return;
 
   await supabaseClient.from('messages').delete().neq('id', 0);
   await supabaseClient.from('players').delete().neq('id', 0);

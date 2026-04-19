@@ -267,7 +267,7 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let currentRequest = null;
-let messageSubscription = null;
+let lastMsgId = 0; // 记录最后一条消息ID，防止重复渲染
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -309,20 +309,13 @@ async function login() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
-  subscribeMessages();
-  startLoop();
-}
-
-// 实时订阅消息（修复：双方都能收到）
-function subscribeMessages() {
-  if (messageSubscription) messageSubscription.unsubscribe();
-  
-  messageSubscription = supabaseClient
-    .from('messages')
-    .on('INSERT', payload => {
-      renderSingleMessage(payload.new);
-    })
-    .subscribe();
+  // 先加载历史
+  await loadAllMessages();
+  // 启动轮询（300ms，稳定）
+  setInterval(loadNewMessages, 300);
+  setInterval(checkPrivateRequest, 500);
+  setInterval(refreshPrivateStatusPanel, 800);
+  setInterval(updateMyUiStatus, 800);
 }
 
 // 展开/收缩私聊面板
@@ -338,14 +331,7 @@ function togglePrivatePanel() {
   }
 }
 
-// 启动轮询
-function startLoop() {
-  setInterval(checkPrivateRequest, 500);
-  setInterval(refreshPrivateStatusPanel, 800);
-  setInterval(updateMyUiStatus, 800);
-}
-
-// 刷新：当前是否在私聊（顶部显示）
+// 刷新顶部私聊状态
 function updateMyUiStatus() {
   const el = document.getElementById('privateStatus');
   if (mode === 'private' && privatePartner) {
@@ -355,7 +341,7 @@ function updateMyUiStatus() {
   }
 }
 
-// 刷新：所有私聊中的人（面板）
+// 刷新所有私聊中的人
 async function refreshPrivateStatusPanel() {
   const { data: users } = await supabaseClient
     .from('players')
@@ -470,24 +456,65 @@ async function endPrivate() {
 // 清空消息区
 function clearMessages() {
   document.getElementById('messages').innerHTML = '';
+  lastMsgId = 0;
 }
 
-// 渲染单条消息（修复：私聊双向可见）
-function renderSingleMessage(msg) {
-  const dom = document.getElementById('messages');
-  
-  // 群聊过滤
-  if (mode === 'group' && msg.type !== 'public') return;
-  
-  // 私聊过滤（核心修复）
-  if (mode === 'private') {
-    if (msg.type !== 'private') return;
-    const isMyPrivate =
-      (msg.from_id === me && msg.to_id === privatePartner) ||
-      (msg.from_id === privatePartner && msg.to_id === me);
-    if (!isMyPrivate) return;
-  }
+// 加载全部历史（登录时）
+async function loadAllMessages() {
+  const { data: list } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: true });
 
+  if (!list) return;
+  const dom = document.getElementById('messages');
+  dom.innerHTML = '';
+  list.forEach(msg => {
+    if (shouldShowMessage(msg)) {
+      renderMessage(msg);
+      if (msg.id > lastMsgId) lastMsgId = msg.id;
+    }
+  });
+  dom.scrollTop = dom.scrollHeight;
+}
+
+// 只加载新消息（轮询）
+async function loadNewMessages() {
+  const { data: list } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .gt('id', lastMsgId)
+    .order('created_at', { ascending: true });
+
+  if (!list || list.length === 0) return;
+  list.forEach(msg => {
+    if (shouldShowMessage(msg)) {
+      renderMessage(msg);
+      if (msg.id > lastMsgId) lastMsgId = msg.id;
+    }
+  });
+  const dom = document.getElementById('messages');
+  dom.scrollTop = dom.scrollHeight;
+}
+
+// 核心：判断消息是否显示（修复所有不显示问题）
+function shouldShowMessage(msg) {
+  // 群聊：只看 public
+  if (mode === 'group') {
+    return msg.type === 'public';
+  }
+  // 私聊：只看我和对象之间的 private
+  if (mode === 'private') {
+    return msg.type === 'private' &&
+      ((msg.from_id === me && msg.to_id === privatePartner) ||
+       (msg.from_id === privatePartner && msg.to_id === me));
+  }
+  return false;
+}
+
+// 渲染单条消息
+function renderMessage(msg) {
+  const dom = document.getElementById('messages');
   let html = '';
   if (msg.type === 'system') {
     html = `<div class="sys">${msg.content}</div>`;
@@ -500,21 +527,7 @@ function renderSingleMessage(msg) {
       <div class="bubble">${msg.content}</div>
     </div>`;
   }
-
   dom.insertAdjacentHTML('beforeend', html);
-  dom.scrollTop = dom.scrollHeight;
-}
-
-// 加载历史消息
-async function loadMessages() {
-  const { data: list } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  const dom = document.getElementById('messages');
-  dom.innerHTML = '';
-  list.forEach(msg => renderSingleMessage(msg));
 }
 
 // 发送消息

@@ -19,14 +19,13 @@
     margin: 0 auto;
   }
 
-  /* =============== 登录界面 =============== */
+  /* ========== 登录界面 ========== */
   #login {
     height: 100vh;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 30px;
+    padding: 0 20px;
     background: linear-gradient(160deg, #1a1d24, #111318);
   }
 
@@ -53,24 +52,24 @@
 
   #playerId {
     width: 100%;
-    padding: 14px 18px;
-    background: #2d323d;
-    color: #fff;
-    border: none;
+    padding: 14px;
     border-radius: 12px;
+    border: none;
+    background: #2d323d;
+    color: white;
     font-size: 16px;
     text-align: center;
-    margin-bottom: 20px;
     outline: none;
+    margin-bottom: 20px;
   }
 
   #loginBtn {
     width: 100%;
     padding: 14px;
-    background: #07c160;
-    color: #fff;
-    border: none;
     border-radius: 12px;
+    background: #07c160;
+    color: white;
+    border: none;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
@@ -88,7 +87,7 @@
     margin-top: 12px;
   }
 
-  /* =============== 主界面 =============== */
+  /* ========== 主界面 ========== */
   #app {
     display: none;
     height: 100vh;
@@ -112,6 +111,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    background: #1a1d24;
   }
 
   /* 系统提示 */
@@ -124,15 +124,15 @@
     font-size: 12px;
   }
 
-  /* 别人：左头像 + 左气泡 */
+  /* 别人的消息：左头像 + 左气泡 */
   .msg-other {
     align-self: flex-start;
     display: flex;
+    align-items: flex-start;
     gap: 8px;
     max-width: 70%;
   }
 
-  /* 头像 */
   .avatar {
     width: 36px;
     height: 36px;
@@ -143,20 +143,22 @@
     justify-content: center;
     color: #fff;
     font-weight: bold;
+    font-size: 14px;
     flex-shrink: 0;
   }
 
   .msg-other .bubble {
     background: #2d323d;
     color: #eee;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    position: relative;
     word-break: break-all;
     font-size: 15px;
     line-height: 1.4;
   }
 
-  /* 自己：右气泡 + 右头像 */
+  /* 自己的消息：右气泡 + 右头像 */
   .msg-me {
     align-self: flex-end;
     display: flex;
@@ -168,8 +170,8 @@
   .msg-me .bubble {
     background: #07c160;
     color: #fff;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
     word-break: break-all;
     font-size: 15px;
     line-height: 1.4;
@@ -178,7 +180,7 @@
   /* 输入框 */
   #input-area {
     display: flex;
-    padding: 10px;
+    padding: 12px;
     background: #252a33;
     gap: 8px;
     border-top: 1px solid #333;
@@ -187,22 +189,22 @@
   #msgInput {
     flex: 1;
     padding: 10px 14px;
-    background: #2d323d;
+    border: 1px solid #333;
+    background: #1a1d24;
     color: #fff;
-    border: none;
     border-radius: 20px;
     outline: none;
     font-size: 15px;
   }
 
   #sendBtn {
-    padding: 10px 18px;
+    padding: 10px 20px;
     background: #07c160;
     color: #fff;
     border: none;
     border-radius: 20px;
-    font-weight: bold;
     cursor: pointer;
+    font-weight: bold;
   }
 </style>
 </head>
@@ -212,7 +214,7 @@
 <!-- 登录 -->
 <div id="login">
   <div class="login-card">
-    <h1>匿名聊天室</h1>
+    <h1>🎭 匿名聊天室</h1>
     <p>输入房间编号（1‑8）即可进入</p>
     <input id="playerId" placeholder="请输入编号" maxlength="1">
     <button id="loginBtn" onclick="enterRoom()">进入房间</button>
@@ -234,88 +236,105 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+// 配置区
+const SUPABASE_URL = 'https://mronesaayjtjuhwvzouj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false }
 });
-
 let myId = null;
 
 // 进入房间
 async function enterRoom() {
   const input = document.getElementById('playerId').value.trim();
-  const err = document.getElementById('loginError');
-  err.innerText = '';
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
 
-  let num = input.replace(/\D/g, '') || '1';
-  num = Math.max(1, Math.min(8, num));
+  let num = input.replace(/[^\d]/g, '') || '1';
+  num = Math.max(1, Math.min(8, parseInt(num) || 1));
   const id = num + '号';
 
-  const timeLimit = new Date(Date.now() - 30000).toISOString();
-  const { data: exist } = await supabaseClient
+  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
+  const { data: existing } = await supabaseClient
     .from('players')
     .select('*')
     .eq('player_id', id)
-    .gt('last_seen', timeLimit)
+    .gt('last_seen', thirtySecondsAgo)
     .maybeSingle();
 
-  if (exist) {
-    err.innerText = '该编号已被占用';
+  if (existing) {
+    errorEl.textContent = '该编号已被使用，请换其他编号';
     return;
   }
 
   myId = id;
+
   await supabaseClient.from('players').upsert({
     player_id: id,
     last_seen: new Date().toISOString()
   });
 
+  setInterval(() => {
+    supabaseClient.from('players').upsert({
+      player_id: id,
+      last_seen: new Date().toISOString()
+    });
+  }, 10000);
+
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('myId').innerText = '我是：' + myId;
+  document.getElementById('myId').textContent = '我是：' + myId;
 
-  setInterval(loadMessages, 600);
+  await supabaseClient.from('messages').insert({
+    type: 'system',
+    from_id: 'system',
+    to_id: 'all',
+    content: myId + ' 进入了房间'
+  });
+
+  // 启动自动刷新
+  setInterval(loadMessages, 500);
 }
 
-// 加载消息
+// 加载消息（区分自己/别人）
 async function loadMessages() {
-  const { data: msgList } = await supabaseClient
+  const { data: messages } = await supabaseClient
     .from('messages')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(100);
 
-  const dom = document.getElementById('messages');
+  const container = document.getElementById('messages');
   let html = '';
 
-  msgList.forEach(m => {
-    if (m.type === 'system') {
-      html += `<div class="msg-system">${m.content}</div>`;
+  messages.forEach(msg => {
+    if (msg.type === 'system') {
+      html += `<div class="msg-system">${msg.content}</div>`;
       return;
     }
 
-    const num = m.from_id.replace('号', '');
+    const numText = msg.from_id.replace('号', '');
 
-    if (m.from_id === myId) {
+    if (msg.from_id === myId) {
       html += `
         <div class="msg-me">
-          <div class="avatar">${num}</div>
-          <div class="bubble">${m.content}</div>
+          <div class="avatar">${numText}</div>
+          <div class="bubble">${msg.content}</div>
         </div>
       `;
     } else {
       html += `
         <div class="msg-other">
-          <div class="avatar">${num}</div>
-          <div class="bubble">${m.content}</div>
+          <div class="avatar">${numText}</div>
+          <div class="bubble">${msg.content}</div>
         </div>
       `;
     }
   });
 
-  dom.innerHTML = html;
-  dom.scrollTop = dom.scrollHeight;
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
 }
 
 // 发送消息

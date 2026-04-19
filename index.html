@@ -267,6 +267,7 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let currentRequest = null;
+let messageSubscription = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -308,7 +309,20 @@ async function login() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
+  subscribeMessages();
   startLoop();
+}
+
+// 实时订阅消息（修复：双方都能收到）
+function subscribeMessages() {
+  if (messageSubscription) messageSubscription.unsubscribe();
+  
+  messageSubscription = supabaseClient
+    .from('messages')
+    .on('INSERT', payload => {
+      renderSingleMessage(payload.new);
+    })
+    .subscribe();
 }
 
 // 展开/收缩私聊面板
@@ -326,7 +340,6 @@ function togglePrivatePanel() {
 
 // 启动轮询
 function startLoop() {
-  setInterval(loadMessages, 500);
   setInterval(checkPrivateRequest, 500);
   setInterval(refreshPrivateStatusPanel, 800);
   setInterval(updateMyUiStatus, 800);
@@ -424,6 +437,7 @@ async function acceptPrivate() {
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
+  clearMessages();
 }
 
 // 拒绝私聊
@@ -450,9 +464,48 @@ async function endPrivate() {
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
+  clearMessages();
 }
 
-// 加载消息（修复私聊可见性）
+// 清空消息区
+function clearMessages() {
+  document.getElementById('messages').innerHTML = '';
+}
+
+// 渲染单条消息（修复：私聊双向可见）
+function renderSingleMessage(msg) {
+  const dom = document.getElementById('messages');
+  
+  // 群聊过滤
+  if (mode === 'group' && msg.type !== 'public') return;
+  
+  // 私聊过滤（核心修复）
+  if (mode === 'private') {
+    if (msg.type !== 'private') return;
+    const isMyPrivate =
+      (msg.from_id === me && msg.to_id === privatePartner) ||
+      (msg.from_id === privatePartner && msg.to_id === me);
+    if (!isMyPrivate) return;
+  }
+
+  let html = '';
+  if (msg.type === 'system') {
+    html = `<div class="sys">${msg.content}</div>`;
+  } else {
+    const num = msg.from_id.replace('号', '');
+    const isMe = msg.from_id === me;
+    html = `
+    <div class="msg ${isMe ? 'me' : ''}">
+      <div class="avatar" data-id="${msg.from_id}">${num}</div>
+      <div class="bubble">${msg.content}</div>
+    </div>`;
+  }
+
+  dom.insertAdjacentHTML('beforeend', html);
+  dom.scrollTop = dom.scrollHeight;
+}
+
+// 加载历史消息
 async function loadMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
@@ -460,37 +513,8 @@ async function loadMessages() {
     .order('created_at', { ascending: true });
 
   const dom = document.getElementById('messages');
-  let html = '';
-
-  for (const m of list) {
-    // 群聊模式：只看 public
-    if (mode === 'group' && m.type !== 'public') continue;
-
-    // 私聊模式：只看 private，且是我和对象之间
-    if (mode === 'private') {
-      if (m.type !== 'private') continue;
-      const isBetween =
-        (m.from_id === me && m.to_id === privatePartner) ||
-        (m.from_id === privatePartner && m.to_id === me);
-      if (!isBetween) continue;
-    }
-
-    if (m.type === 'system') {
-      html += `<div class="sys">${m.content}</div>`;
-      continue;
-    }
-
-    const num = m.from_id.replace('号', '');
-    const isMe = m.from_id === me;
-    html += `
-    <div class="msg ${isMe ? 'me' : ''}">
-      <div class="avatar" data-id="${m.from_id}">${num}</div>
-      <div class="bubble">${m.content}</div>
-    </div>`;
-  }
-
-  dom.innerHTML = html;
-  dom.scrollTop = dom.scrollHeight;
+  dom.innerHTML = '';
+  list.forEach(msg => renderSingleMessage(msg));
 }
 
 // 发送消息

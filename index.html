@@ -5,51 +5,226 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>匿名聊天室</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif}
-body{background:#EBEBEB;max-width:500px;margin:0 auto}
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
 
-/* 登录 */
-#login{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:0 20px}
-#login h1{font-size:24px;color:#333}
-#playerId{width:100%;padding:12px 16px;border:1px solid #ddd;border-radius:8px;font-size:16px;text-align:center}
-#login button{width:100%;padding:12px;background:#07C160;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
-.error{color:red;font-size:14px}
+  body {
+    background: #1a1d24;
+    color: #eee;
+    max-width: 500px;
+    margin: 0 auto;
+  }
 
-/* 主界面 */
-#app{display:none;height:100vh;flex-direction:column;background:#EBEBEB}
-#header{padding:14px;background:#fff;text-align:center;font-weight:bold;border-bottom:1px solid #E0E0E0}
+  /* =============== 登录界面 =============== */
+  #login {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 30px;
+    background: linear-gradient(160deg, #1a1d24, #111318);
+  }
 
-/* 消息区 */
-#messages{flex:1;padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
-.msg-system{align-self:center;background:rgba(0,0,0,0.1);color:#666;padding:4px 10px;border-radius:4px;font-size:12px}
+  .login-card {
+    width: 100%;
+    background: #252a33;
+    padding: 40px 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    text-align: center;
+  }
 
-/* 别人的消息：左头像 + 左气泡 */
-.msg-other{align-self:flex-start;display:flex;gap:8px;max-width:70%}
-.avatar{width:36px;height:36px;background:#bbb;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;flex-shrink:0}
-.msg-other .bubble{background:#fff;padding:10px 12px;border-radius:8px;position:relative;word-break:break-all;font-size:16px;line-height:1.4}
+  .login-card h1 {
+    font-size: 26px;
+    margin-bottom: 10px;
+    color: #fff;
+  }
 
-/* 自己的消息：右气泡 + 右头像 */
-.msg-me{align-self:flex-end;display:flex;flex-direction:row-reverse;gap:8px;max-width:70%}
-.msg-me .bubble{background:#95EC69;padding:10px 12px;border-radius:8px;word-break:break-all;font-size:16px;line-height:1.4}
+  .login-card p {
+    color: #888;
+    margin-bottom: 30px;
+    font-size: 14px;
+  }
 
-/* 输入框 */
-#input-area{display:flex;padding:10px;background:#fff;gap:8px;border-top:1px solid #E0E0E0}
-#msgInput{flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:16px}
-#sendBtn{padding:8px 16px;background:#07C160;color:#fff;border:none;border-radius:6px;cursor:pointer}
+  #playerId {
+    width: 100%;
+    padding: 14px 18px;
+    background: #2d323d;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    text-align: center;
+    margin-bottom: 20px;
+    outline: none;
+  }
+
+  #loginBtn {
+    width: 100%;
+    padding: 14px;
+    background: #07c160;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  #loginBtn:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+
+  #loginError {
+    color: #ff4444;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  /* =============== 主界面 =============== */
+  #app {
+    display: none;
+    height: 100vh;
+    flex-direction: column;
+    background: #1a1d24;
+  }
+
+  #header {
+    padding: 16px;
+    background: #252a33;
+    text-align: center;
+    font-weight: bold;
+    border-bottom: 1px solid #333;
+  }
+
+  /* 消息区域 */
+  #messages {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* 系统提示 */
+  .msg-system {
+    align-self: center;
+    background: #333;
+    color: #aaa;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  /* 别人：左头像 + 左气泡 */
+  .msg-other {
+    align-self: flex-start;
+    display: flex;
+    gap: 8px;
+    max-width: 70%;
+  }
+
+  /* 头像 */
+  .avatar {
+    width: 36px;
+    height: 36px;
+    background: #555;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .msg-other .bubble {
+    background: #2d323d;
+    color: #eee;
+    padding: 10px 12px;
+    border-radius: 10px;
+    word-break: break-all;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  /* 自己：右气泡 + 右头像 */
+  .msg-me {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 8px;
+    max-width: 70%;
+  }
+
+  .msg-me .bubble {
+    background: #07c160;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 10px;
+    word-break: break-all;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  /* 输入框 */
+  #input-area {
+    display: flex;
+    padding: 10px;
+    background: #252a33;
+    gap: 8px;
+    border-top: 1px solid #333;
+  }
+
+  #msgInput {
+    flex: 1;
+    padding: 10px 14px;
+    background: #2d323d;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    outline: none;
+    font-size: 15px;
+  }
+
+  #sendBtn {
+    padding: 10px 18px;
+    background: #07c160;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+  }
 </style>
 </head>
 
 <body>
 
+<!-- 登录 -->
 <div id="login">
-  <h1>匿名聊天室</h1>
-  <input id="playerId" placeholder="输入1-8进入房间" maxlength="1">
-  <button onclick="enterRoom()">进入房间</button>
-  <p id="loginError" class="error"></p>
+  <div class="login-card">
+    <h1>匿名聊天室</h1>
+    <p>输入房间编号（1‑8）即可进入</p>
+    <input id="playerId" placeholder="请输入编号" maxlength="1">
+    <button id="loginBtn" onclick="enterRoom()">进入房间</button>
+    <div id="loginError"></div>
+  </div>
 </div>
 
+<!-- 主界面 -->
 <div id="app">
-  <div id="header"><span id="myId"></span></div>
+  <div id="header">
+    <span id="myId"></span>
+  </div>
   <div id="messages"></div>
   <div id="input-area">
     <input id="msgInput" placeholder="输入消息..." onkeypress="if(event.key==='Enter')sendMessage()">
@@ -62,7 +237,9 @@ body{background:#EBEBEB;max-width:500px;margin:0 auto}
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false }
+});
 
 let myId = null;
 
@@ -78,12 +255,22 @@ async function enterRoom() {
 
   const timeLimit = new Date(Date.now() - 30000).toISOString();
   const { data: exist } = await supabaseClient
-    .from('players').select('*').eq('player_id', id).gt('last_seen', timeLimit).maybeSingle();
+    .from('players')
+    .select('*')
+    .eq('player_id', id)
+    .gt('last_seen', timeLimit)
+    .maybeSingle();
 
-  if (exist) { err.innerText = '编号已被占用'; return; }
+  if (exist) {
+    err.innerText = '该编号已被占用';
+    return;
+  }
 
   myId = id;
-  await supabaseClient.from('players').upsert({ player_id: id, last_seen: new Date().toISOString() });
+  await supabaseClient.from('players').upsert({
+    player_id: id,
+    last_seen: new Date().toISOString()
+  });
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -95,7 +282,9 @@ async function enterRoom() {
 // 加载消息
 async function loadMessages() {
   const { data: msgList } = await supabaseClient
-    .from('messages').select('*').order('created_at', { ascending: true });
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: true });
 
   const dom = document.getElementById('messages');
   let html = '';
@@ -106,19 +295,19 @@ async function loadMessages() {
       return;
     }
 
-    const numText = m.from_id.replace('号', '');
+    const num = m.from_id.replace('号', '');
 
     if (m.from_id === myId) {
       html += `
         <div class="msg-me">
-          <div class="avatar">${numText}</div>
+          <div class="avatar">${num}</div>
           <div class="bubble">${m.content}</div>
         </div>
       `;
     } else {
       html += `
         <div class="msg-other">
-          <div class="avatar">${numText}</div>
+          <div class="avatar">${num}</div>
           <div class="bubble">${m.content}</div>
         </div>
       `;
@@ -136,7 +325,10 @@ async function sendMessage() {
   if (!content || !myId) return;
 
   await supabaseClient.from('messages').insert({
-    type: 'public', from_id: myId, to_id: 'all', content: content
+    type: 'public',
+    from_id: myId,
+    to_id: 'all',
+    content: content
   });
 
   input.value = '';

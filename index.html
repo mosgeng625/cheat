@@ -8,108 +8,156 @@
         *{margin:0;padding:0;box-sizing:border-box}
         body{background:#1a1a2e;color:#eee;font-family:Arial}
         #login{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-        input,button{padding:10px;border-radius:6px}
-        button{background:#e94560;color:white;border:none}
+        #login input{padding:12px;width:200px;border:2px solid #e94560;background:#16213e;color:#fff;border-radius:8px;font-size:16px;text-align:center}
+        #login button{padding:12px 40px;background:#e94560;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+        .error{color:#ff6b6b}
         #app{display:none;height:100vh;display:flex;flex-direction:column}
+        #header{padding:15px;background:#16213e;display:flex;justify-content:space-between;align-items:center}
         #messages{flex:1;padding:20px;overflow-y:auto}
-        .msg{background:#16213e;padding:10px;margin:10px 0;border-radius:8px}
+        .msg{background:#16213e;padding:10px 15px;margin:10px 0;border-radius:8px;max-width:80%}
+        .msg-header{color:#e94560;font-size:12px;margin-bottom:5px}
+        .msg-content{font-size:15px}
+        #input-area{display:flex;padding:15px;background:#16213e}
+        #msgInput{flex:1;padding:12px;border:1px solid #533483;background:#0f3460;color:#fff;border-radius:8px;font-size:15px}
+        #sendBtn{padding:12px 20px;background:#e94560;color:white;border:none;border-radius:8px;cursor:pointer;margin-left:10px}
     </style>
 </head>
-
 <body>
+
 <div id="login">
-    <h1>匿名聊天室</h1>
+    <h1>🎭 匿名聊天室</h1>
     <input id="playerId" placeholder="输入1-8" maxlength="1">
     <button onclick="enterRoom()">进入房间</button>
-    <p id="err" style="color:red"></p>
+    <p id="loginError" class="error"></p>
 </div>
 
 <div id="app">
-    <div style="padding:10px;background:#16213e">
+    <div id="header">
         <span id="myId"></span>
     </div>
     <div id="messages"></div>
-    <div style="display:flex;padding:10px">
-        <input id="msgInput" style="flex:1" onkeydown="if(event.key==='Enter')sendMessage()">
-        <button onclick="sendMessage()">发送</button>
+    <div id="input-area">
+        <input id="msgInput" style="flex:1" onkeypress="if(event.key==='Enter')sendMessage()">
+        <button id="sendBtn" onclick="sendMessage()">发送</button>
     </div>
 </div>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-// ==================== 你的配置 ====================
-const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+// 配置区
+const SUPABASE_URL = 'https://mronesaayjtjuhwvzouj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY';
 
 // 客户端
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false }
 });
-
 let myId = null;
 
-// 自动刷新（强制实时）
-setInterval(loadMessages, 1000);
-
-// ==================== 进入房间 ====================
+// 登录函数
 async function enterRoom() {
-  let v = document.getElementById("playerId").value.trim() || "1";
-  let id = v.replace(/\D/g, "") + "号";
+  const input = document.getElementById('playerId').value.trim();
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
 
-  let { data: exist } = await client
-    .from("players")
-    .select("*")
-    .eq("player_id", id)
-    .gt("last_seen", new Date(Date.now() - 30000).toISOString())
+  let num = input.replace(/[^\d]/g, '') || '1';
+  num = Math.max(1, Math.min(8, parseInt(num) || 1));
+  const id = num + '号';
+
+  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
+  const { data: existing } = await supabaseClient
+    .from('players')
+    .select('*')
+    .eq('player_id', id)
+    .gt('last_seen', thirtySecondsAgo)
     .maybeSingle();
 
-  if (exist) {
-    document.getElementById("err").innerText = "已被占用";
+  if (existing) {
+    errorEl.textContent = '该编号已被使用，请换其他编号';
     return;
   }
 
   myId = id;
-  await client.from("players").upsert({
+
+  await supabaseClient.from('players').upsert({
     player_id: id,
     last_seen: new Date().toISOString()
   });
 
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").style.display = "flex";
-  document.getElementById("myId").innerText = "我是：" + myId;
+  setInterval(() => {
+    supabaseClient.from('players').upsert({
+      player_id: id,
+      last_seen: new Date().toISOString()
+    });
+  }, 10000);
+
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('myId').textContent = '我是：' + myId;
+
+  await supabaseClient.from('messages').insert({
+    type: 'system',
+    from_id: 'system',
+    to_id: 'all',
+    content: myId + ' 进入了房间'
+  });
+
+  // 启动自动刷新
+  startAutoRefresh();
 }
 
-// ==================== 加载消息（每秒自动刷新） ====================
+// 强制自动刷新（核心修复）
+function startAutoRefresh() {
+  setInterval(async () => {
+    await loadMessages();
+  }, 500); // 每0.5秒刷新一次
+}
+
+// 加载消息
 async function loadMessages() {
-  let { data } = await client
-    .from("messages")
-    .select("*")
-    .order("created_at", { ascending: true });
+  const { data: messages } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: true })
+    .limit(100);
 
-  let dom = document.getElementById("messages");
-  dom.innerHTML = "";
-  data.forEach(m => {
-    let d = document.createElement("div");
-    d.className = "msg";
-    d.innerText = m.from_id + "：" + m.content;
-    dom.appendChild(d);
+  const container = document.getElementById('messages');
+  let html = '';
+  messages.forEach(msg => {
+    if (msg.type === 'system') {
+      html += `<div style="text-align:center; color:#888; margin:10px 0; font-size:13px;">${msg.content}</div>`;
+      return;
+    }
+
+    if (msg.type === 'private' && msg.from_id !== myId && msg.to_id !== myId) return;
+
+    html += `
+      <div class="msg">
+        <div class="msg-header">${msg.from_id}</div>
+        <div class="msg-content">${msg.content}</div>
+      </div>
+    `;
   });
-  dom.scrollTop = dom.scrollHeight;
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
 }
 
-// ==================== 发送消息 ====================
+// 发送消息
 async function sendMessage() {
-  let t = document.getElementById("msgInput").value.trim();
-  if (!t || !myId) return;
+  const input = document.getElementById('msgInput');
+  const content = input.value.trim();
+  if (!content || !myId) return;
 
-  await client.from("messages").insert({
+  await supabaseClient.from('messages').insert({
+    type: 'public',
     from_id: myId,
-    content: t,
-    to_id: "all"
+    to_id: 'all',
+    content: content
   });
 
-  document.getElementById("msgInput").value = "";
-  loadMessages();
+  input.value = '';
+  // 发送后立刻刷新
+  await loadMessages();
 }
 </script>
 </body>

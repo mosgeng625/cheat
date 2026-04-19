@@ -13,9 +13,8 @@
         }
 
         body {
-            background: #0f172a;
-            color: #f1f5f9;
-            max-width: 600px;
+            background: #EBEBEB;
+            max-width: 500px;
             margin: 0 auto;
         }
 
@@ -26,46 +25,37 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px;
-            padding: 20px;
+            gap: 16px;
+            padding: 0 20px;
         }
 
         #login h1 {
-            color: #ec4899;
-            font-size: 28px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            color: #333;
         }
 
         #playerId {
             width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            background: #1e293b;
-            color: white;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
             font-size: 16px;
             text-align: center;
-            outline: none;
         }
 
         #login button {
             width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            background: #ec4899;
-            color: white;
-            font-size: 16px;
+            padding: 12px;
+            background: #07C160;
+            color: #fff;
             border: none;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 16px;
             cursor: pointer;
         }
 
-        #login button:active {
-            opacity: 0.8;
-        }
-
         .error {
-            color: #f43f5e;
+            color: red;
             font-size: 14px;
         }
 
@@ -74,87 +64,97 @@
             display: none;
             height: 100vh;
             flex-direction: column;
+            background: #EBEBEB;
         }
 
         #header {
-            padding: 16px;
-            background: #1e293b;
+            padding: 14px;
+            background: #fff;
             text-align: center;
             font-weight: bold;
-            font-size: 16px;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #E0E0E0;
         }
 
-        /* 消息区域 */
+        /* 消息列表 */
         #messages {
             flex: 1;
-            padding: 16px;
+            padding: 10px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
         }
 
         /* 系统提示 */
         .msg-system {
-            text-align: center;
-            color: #94a3b8;
+            align-self: center;
+            background: rgba(0,0,0,0.1);
+            color: #666;
+            padding: 4px 10px;
+            border-radius: 4px;
             font-size: 12px;
-            margin: 8px 0;
         }
 
-        /* 别人的消息 */
+        /* 别人的消息：左气泡 */
         .msg-other {
             align-self: flex-start;
-            background: #1e293b;
-            padding: 10px 14px;
-            border-radius: 14px 14px 14px 4px;
-            max-width: 75%;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            max-width: 70%;
         }
-
+        .msg-other .bubble {
+            background: #fff;
+            padding: 10px 12px;
+            border-radius: 8px;
+            position: relative;
+            word-break: break-all;
+            font-size: 16px;
+            line-height: 1.4;
+        }
         .msg-other .name {
             font-size: 12px;
-            color: #94a3b8;
+            color: #666;
             margin-bottom: 4px;
         }
 
-        /* 自己的消息 */
+        /* 自己的消息：右气泡 */
         .msg-me {
             align-self: flex-end;
-            background: #ec4899;
-            color: white;
-            padding: 10px 14px;
-            border-radius: 14px 14px 4px 14px;
-            max-width: 75%;
+            max-width: 70%;
+        }
+        .msg-me .bubble {
+            background: #95EC69;
+            padding: 10px 12px;
+            border-radius: 8px;
+            word-break: break-all;
+            font-size: 16px;
+            line-height: 1.4;
         }
 
         /* 输入框 */
         #input-area {
             display: flex;
-            padding: 12px;
-            background: #1e293b;
+            padding: 10px;
+            background: #fff;
             gap: 8px;
-            border-top: 1px solid #334155;
+            border-top: 1px solid #E0E0E0;
         }
 
         #msgInput {
             flex: 1;
-            padding: 12px 16px;
-            border-radius: 24px;
-            border: none;
-            background: #334155;
-            color: white;
-            outline: none;
-            font-size: 15px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
         }
 
         #sendBtn {
-            padding: 12px 20px;
-            border-radius: 24px;
-            background: #ec4899;
-            color: white;
+            padding: 8px 16px;
+            background: #07C160;
+            color: #fff;
             border: none;
-            font-weight: bold;
+            border-radius: 6px;
             cursor: pointer;
         }
     </style>
@@ -162,15 +162,13 @@
 
 <body>
 
-<!-- 登录 -->
 <div id="login">
-    <h1>🎭 匿名聊天室</h1>
-    <input id="playerId" placeholder="输入 1-8 进入房间" maxlength="1">
+    <h1>匿名聊天室</h1>
+    <input id="playerId" placeholder="输入1-8进入房间" maxlength="1">
     <button onclick="enterRoom()">进入房间</button>
     <p id="loginError" class="error"></p>
 </div>
 
-<!-- 主界面 -->
 <div id="app">
     <div id="header">
         <span id="myId"></span>
@@ -184,7 +182,6 @@
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-// ==================== 配置 ====================
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 
@@ -194,7 +191,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 let myId = null;
 
-// ==================== 进入房间 ====================
+// 进入房间
 async function enterRoom() {
   const input = document.getElementById('playerId').value.trim();
   const err = document.getElementById('loginError');
@@ -224,16 +221,14 @@ async function enterRoom() {
     last_seen: new Date().toISOString()
   });
 
-  // 显示主界面
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myId').innerText = '我是：' + myId;
 
-  // 自动刷新
-  setInterval(loadMessages, 500);
+  setInterval(loadMessages, 600);
 }
 
-// ==================== 加载消息（区分自己/别人） ====================
+// 加载消息
 async function loadMessages() {
   const { data: msgList } = await supabaseClient
     .from('messages')
@@ -244,26 +239,24 @@ async function loadMessages() {
   let html = '';
 
   msgList.forEach(m => {
-    // 系统消息
     if (m.type === 'system') {
       html += `<div class="msg-system">${m.content}</div>`;
       return;
     }
 
-    // 自己发的
     if (m.from_id === myId) {
       html += `
         <div class="msg-me">
-          ${m.content}
+          <div class="bubble">${m.content}</div>
         </div>
       `;
-    }
-    // 别人发的
-    else {
+    } else {
       html += `
         <div class="msg-other">
-          <div class="name">${m.from_id}</div>
-          ${m.content}
+          <div>
+            <div class="name">${m.from_id}</div>
+            <div class="bubble">${m.content}</div>
+          </div>
         </div>
       `;
     }
@@ -273,7 +266,7 @@ async function loadMessages() {
   dom.scrollTop = dom.scrollHeight;
 }
 
-// ==================== 发送消息 ====================
+// 发送
 async function sendMessage() {
   const input = document.getElementById('msgInput');
   const content = input.value.trim();

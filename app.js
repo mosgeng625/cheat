@@ -1,24 +1,24 @@
 // ==================== 配置区（必须修改）====================
-const SUPABASE_URL = 'https://mronesaayjtjuhwvzouj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY';
+const SUPABASE_URL = 'https://你的项目名.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...你的anon key';
 const ADMIN_PASSWORD = 'admin123';
 
-// ==================== 全局变量（改用let，避免重复声明）====================
+// ==================== 改用let，避免重复声明 ====================
 let supabase;
 let myId = null;
 let currentPrivateTarget = null;
 
-// ==================== 初始化（单例模式 + 禁用存储访问）====================
+// ==================== 单例初始化（解决重复声明+存储拦截）====================
 if (!window.supabaseInstance) {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false } // 解决Tracking Prevention拦截
+    auth: { persistSession: false }
   });
   window.supabaseInstance = supabase;
 } else {
   supabase = window.supabaseInstance;
 }
 
-// ==================== 登录（绑定到window，确保全局可访问）====================
+// ==================== 登录函数（绑定到window，全局可访问）====================
 window.enterRoom = async function() {
   const input = document.getElementById('playerId').value.trim();
   const errorEl = document.getElementById('loginError');

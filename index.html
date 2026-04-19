@@ -26,16 +26,40 @@
     align-items: center;
     justify-content: center;
     padding: 0 20px;
-    background: linear-gradient(160deg, #1a1d24, #111318);
+    background: url("https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80") center / cover no-repeat;
+    position: relative;
+  }
+
+  /* 加个半透明遮罩，让文字更清晰 */
+  #login::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+  }
+
+  .login-top-title {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    z-index: 1;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
   }
 
   .login-card {
     width: 100%;
-    background: #252a33;
-       padding: 40px 30px;
+    background: rgba(37, 42, 51, 0.9);
+    padding: 40px 30px;
     border-radius: 20px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.4);
     text-align: center;
+    position: relative;
+    z-index: 1;
   }
 
   .login-card h1 {
@@ -59,8 +83,8 @@
     border-radius: 12px;
     font-size: 16px;
     text-align: center;
-    margin-bottom: 20px;
     outline: none;
+    margin-bottom: 20px;
   }
 
   #loginBtn {
@@ -99,19 +123,19 @@
     padding: 16px;
     background: #252a33;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     border-bottom: 1px solid #333;
   }
 
-  #header .title {
+  #myId {
     font-weight: bold;
     font-size: 16px;
   }
 
   #resetBtn {
-    padding: 6px 12px;
-    background: #ff4444;
+    padding: 6px 10px;
+    background: #ef4444;
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -166,7 +190,7 @@
   .msg-other .bubble {
     background: #2d323d;
     color: #eee;
-    padding: 10px 12px;
+    padding: 10px 14px;
     border-radius: 10px;
     word-break: break-all;
     font-size: 15px;
@@ -185,7 +209,7 @@
   .msg-me .bubble {
     background: #07c160;
     color: #fff;
-    padding: 10px 12px;
+    padding: 10px 14px;
     border-radius: 10px;
     word-break: break-all;
     font-size: 15px;
@@ -213,12 +237,72 @@
   }
 
   #sendBtn {
-    padding: 10px 18px;
+    padding: 10px 20px;
     background: #07c160;
     color: #fff;
     border: none;
     border-radius: 20px;
     cursor: pointer;
+    font-weight: bold;
+  }
+
+  /* 重置弹窗 */
+  #resetModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-card {
+    background: #252a33;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 350px;
+    text-align: center;
+  }
+
+  .modal-card h3 {
+    margin-bottom: 20px;
+    color: #fff;
+  }
+
+  .modal-card input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 20px;
+    background: #1a1d24;
+    color: #fff;
+    text-align: center;
+  }
+
+  .modal-btn-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .modal-btn-group button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+
+  .cancel-btn {
+    background: #555;
+    color: #fff;
+  }
+
+  .confirm-btn {
+    background: #ff4444;
+    color: #fff;
   }
 </style>
 </head>
@@ -227,6 +311,7 @@
 
 <!-- 登录 -->
 <div id="login">
+  <div class="login-top-title">吴彦祖们的秘密基地</div>
   <div class="login-card">
     <h1>🎭 匿名聊天室</h1>
     <p>输入房间编号（1‑8）即可进入</p>
@@ -239,8 +324,8 @@
 <!-- 主界面 -->
 <div id="app">
   <div id="header">
-    <span class="title" id="myId"></span>
-    <button id="resetBtn" onclick="showAdminModal()">重置房间</button>
+    <span id="myId"></span>
+    <button id="resetBtn" onclick="showResetModal()">重置房间</button>
   </div>
   <div id="messages"></div>
   <div id="input-area">
@@ -249,61 +334,60 @@
   </div>
 </div>
 
-<!-- 重置密码弹窗 -->
-<div id="adminModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)closeAdminModal()">
-  <div style="background:#252a33;padding:30px;border-radius:12px;width:90%;max-width:350px;text-align:center">
-    <h3 style="margin-bottom:20px;color:#fff">房主控制</h3>
-    <input id="adminPassword" type="password" placeholder="输入重置密码" style="width:100%;padding:12px;border-radius:8px;border:none;margin-bottom:20px;background:#1a1d24;color:#fff;text-align:center">
-    <div style="display:flex;gap:10px;justify-content:center">
-      <button onclick="closeAdminModal()" style="padding:10px 20px;background:#555;color:#fff;border:none;border-radius:8px;cursor:pointer">取消</button>
-      <button onclick="confirmReset()" style="padding:10px 20px;background:#ff4444;color:#fff;border:none;border-radius:8px;cursor:pointer">确认重置</button>
+<!-- 重置弹窗 -->
+<div id="resetModal" onclick="if(event.target===this)closeResetModal()">
+  <div class="modal-card">
+    <h3>房主控制</h3>
+    <input id="resetPwd" type="password" placeholder="输入重置密码">
+    <div class="modal-btn-group">
+      <button class="cancel-btn" onclick="closeResetModal()">取消</button>
+      <button class="confirm-btn" onclick="confirmReset()">确认重置</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-// ==================== 配置 ====================
-const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
-const ADMIN_PASSWORD = "admin123"; // 重置密码，你可以改成自己的
+// 配置区
+const SUPABASE_URL = 'https://mronesaayjtjuhwvzouj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY';
+const ADMIN_PASSWORD = 'admin123';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false }
 });
-
 let myId = null;
 
-// ==================== 进入房间 ====================
+// 进入房间
 async function enterRoom() {
   const input = document.getElementById('playerId').value.trim();
-  const err = document.getElementById('loginError');
-  err.innerText = '';
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
 
-  let num = input.replace(/\D/g, '') || '1';
-  num = Math.max(1, Math.min(8, num));
+  let num = input.replace(/[^\d]/g, '') || '1';
+  num = Math.max(1, Math.min(8, parseInt(num) || 1));
   const id = num + '号';
 
-  const timeLimit = new Date(Date.now() - 30000).toISOString();
-  const { data: exist } = await supabaseClient
+  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
+  const { data: existing } = await supabaseClient
     .from('players')
     .select('*')
     .eq('player_id', id)
-    .gt('last_seen', timeLimit)
+    .gt('last_seen', thirtySecondsAgo)
     .maybeSingle();
 
-  if (exist) {
-    err.innerText = '编号已被占用';
+  if (existing) {
+    errorEl.textContent = '该编号已被使用，请换其他编号';
     return;
   }
 
   myId = id;
+
   await supabaseClient.from('players').upsert({
     player_id: id,
     last_seen: new Date().toISOString()
   });
 
-  // 心跳保活
   setInterval(() => {
     supabaseClient.from('players').upsert({
       player_id: id,
@@ -313,7 +397,7 @@ async function enterRoom() {
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('myId').innerText = '我是：' + myId;
+  document.getElementById('myId').textContent = '我是：' + myId;
 
   await supabaseClient.from('messages').insert({
     type: 'system',
@@ -322,49 +406,51 @@ async function enterRoom() {
     content: myId + ' 进入了房间'
   });
 
-  setInterval(loadMessages, 600);
+  // 启动自动刷新
+  setInterval(loadMessages, 500);
 }
 
-// ==================== 加载消息 ====================
+// 加载消息
 async function loadMessages() {
-  const { data: msgList } = await supabaseClient
+  const { data: messages } = await supabaseClient
     .from('messages')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(100);
 
-  const dom = document.getElementById('messages');
+  const container = document.getElementById('messages');
   let html = '';
 
-  msgList.forEach(m => {
-    if (m.type === 'system') {
-      html += `<div class="msg-system">${m.content}</div>`;
+  messages.forEach(msg => {
+    if (msg.type === 'system') {
+      html += `<div class="msg-system">${msg.content}</div>`;
       return;
     }
 
-    const numText = m.from_id.replace('号', '');
+    const numText = msg.from_id.replace('号', '');
 
-    if (m.from_id === myId) {
+    if (msg.from_id === myId) {
       html += `
         <div class="msg-me">
           <div class="avatar">${numText}</div>
-          <div class="bubble">${m.content}</div>
+          <div class="bubble">${msg.content}</div>
         </div>
       `;
     } else {
       html += `
         <div class="msg-other">
           <div class="avatar">${numText}</div>
-          <div class="bubble">${m.content}</div>
+          <div class="bubble">${msg.content}</div>
         </div>
       `;
     }
   });
 
-  dom.innerHTML = html;
-  dom.scrollTop = dom.scrollHeight;
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
 }
 
-// ==================== 发送消息 ====================
+// 发送消息
 async function sendMessage() {
   const input = document.getElementById('msgInput');
   const content = input.value.trim();
@@ -381,18 +467,18 @@ async function sendMessage() {
   loadMessages();
 }
 
-// ==================== 重置房间 ====================
-function showAdminModal() {
-  document.getElementById('adminModal').style.display = 'flex';
+// 重置房间弹窗
+function showResetModal() {
+  document.getElementById('resetModal').style.display = 'flex';
 }
 
-function closeAdminModal() {
-  document.getElementById('adminModal').style.display = 'none';
-  document.getElementById('adminPassword').value = '';
+function closeResetModal() {
+  document.getElementById('resetModal').style.display = 'none';
+  document.getElementById('resetPwd').value = '';
 }
 
 async function confirmReset() {
-  const pwd = document.getElementById('adminPassword').value.trim();
+  const pwd = document.getElementById('resetPwd').value.trim();
   if (pwd !== ADMIN_PASSWORD) {
     alert('密码错误');
     return;
@@ -404,7 +490,7 @@ async function confirmReset() {
   await supabaseClient.from('players').delete().neq('id', 0);
 
   alert('房间已重置，请所有人重新进入');
-  closeAdminModal();
+  closeResetModal();
   location.reload();
 }
 </script>

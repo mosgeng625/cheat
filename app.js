@@ -1,15 +1,15 @@
+// 配置区
 const SUPABASE_URL = 'https://mronesaaytjjtuhwvzouj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheXRqanR1aHd2em91aiIsImlhdCI6MTc0NDk3NTY2MiwiZXhwIjoxOTYwNTUxNjYyfQ.8Z4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheXRqanR1aHd2em91aiIsImlhdCI6MTc0NDk3NTY2MiwiZXhwIjoxOTYwNTUxNjYyfQ.8Z4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4';
 const ADMIN_PASSWORD = 'admin123';
 
+// 全局变量（只声明一次！）
 let supabase;
 let myId = null;
 let currentPrivateTarget = null;
 
+// 初始化Supabase客户端（单例模式）
 if (!window.supabaseInstance) {
-  if (typeof window.supabase === 'undefined') {
-    alert('Supabase SDK加载失败，请检查CDN链接！');
-  }
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false }
   });
@@ -18,7 +18,7 @@ if (!window.supabaseInstance) {
   supabase = window.supabaseInstance;
 }
 
-// 登录函数（绑定到window）
+// 登录函数
 window.enterRoom = async function() {
   const input = document.getElementById('playerId').value.trim();
   const errorEl = document.getElementById('loginError');

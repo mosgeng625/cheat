@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>匿名聊天室</title>
+<title>聊天室</title>
 <style>
   * {
     margin: 0;
@@ -23,25 +23,16 @@
   #login {
     height: 100vh;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 0 20px;
     background: #111318;
   }
 
-  /* 图片（只占用一部分空间，不铺满） */
-  .login-img {
-    width: 70%;
-    height: auto;
-    border-radius: 12px;
-    margin-bottom: 20px;
-  }
-
   .login-card {
     width: 100%;
     background: #252a33;
-    padding: 30px 24px;
+    padding: 40px 30px;
     border-radius: 20px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.4);
     text-align: center;
@@ -55,7 +46,7 @@
 
   .login-card p {
     color: #888;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
     font-size: 14px;
   }
 
@@ -82,12 +73,6 @@
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    transition: 0.2s;
-  }
-
-  #loginBtn:active {
-    transform: scale(0.97);
-    opacity: 0.9;
   }
 
   #loginError {
@@ -139,7 +124,6 @@
     background: #1a1d24;
   }
 
-  /* 系统提示 */
   .msg-system {
     align-self: center;
     background: #333;
@@ -149,11 +133,10 @@
     font-size: 12px;
   }
 
-  /* 别人：左头像 + 左气泡 */
+  /* 别人消息 */
   .msg-other {
     align-self: flex-start;
     display: flex;
-    align-items: flex-start;
     gap: 8px;
     max-width: 70%;
   }
@@ -168,7 +151,6 @@
     justify-content: center;
     color: #fff;
     font-weight: bold;
-    font-size: 14px;
     flex-shrink: 0;
   }
 
@@ -176,13 +158,11 @@
     background: #2d323d;
     color: #eee;
     padding: 10px 12px;
-    border-radius: 10px;
-    word-break: break-all;
+    border-radius: 8px;
     font-size: 15px;
-    line-height: 1.4;
   }
 
-  /* 自己：右气泡 + 右头像 */
+  /* 自己消息 */
   .msg-me {
     align-self: flex-end;
     display: flex;
@@ -195,10 +175,8 @@
     background: #07c160;
     color: #fff;
     padding: 10px 12px;
-    border-radius: 10px;
-    word-break: break-all;
+    border-radius: 8px;
     font-size: 15px;
-    line-height: 1.4;
   }
 
   /* 输入框 */
@@ -218,7 +196,6 @@
     border: none;
     border-radius: 20px;
     outline: none;
-    font-size: 15px;
   }
 
   #sendBtn {
@@ -241,56 +218,32 @@
     justify-content: center;
   }
 
-  .modal-card {
+  .modal-box {
     background: #252a33;
     padding: 30px;
     border-radius: 14px;
     width: 90%;
-    max-width: 360px;
+    max-width: 350px;
     text-align: center;
   }
 
-  .modal-card input {
+  .modal-box input {
     width: 100%;
     padding: 12px;
-    border-radius: 8px;
-    border: none;
     background: #1a1d24;
     color: #fff;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-
-  .modal-btn-group {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-
-  .modal-btn-group button {
-    padding: 10px 16px;
-    border-radius: 8px;
     border: none;
-    cursor: pointer;
-  }
-
-  .cancel-btn {
-    background: #444;
-    color: #fff;
-  }
-
-  .confirm-btn {
-    background: #ef4444;
-    color: #fff;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 20px;
   }
 </style>
 </head>
 
 <body>
 
-<!-- 登录 -->
+<!-- 登录界面 -->
 <div id="login">
-  <img class="login-img" src="https://p26-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/a8c410f64de84c7d9411102c8a8bc577.png">
   <div class="login-card">
     <h1>🔞20岁的少年心事🔞</h1>
     <p>输入房间编号（1‑8）即可进入</p>
@@ -314,26 +267,24 @@
 </div>
 
 <!-- 重置弹窗 -->
-<div id="resetModal" onclick="if(event.target===this)closeResetModal()">
-  <div class="modal-card">
-    <h3 style="margin-bottom:20px;color:#fff">重置房间</h3>
-    <input id="resetPwd" type="password" placeholder="请输入重置密码">
-    <div class="modal-btn-group">
-      <button class="cancel-btn" onclick="closeResetModal()">取消</button>
-      <button class="confirm-btn" onclick="doReset()">确认重置</button>
+<div id="resetModal">
+  <div class="modal-box">
+    <h3>重置房间</h3>
+    <input id="resetPwd" type="password" placeholder="输入重置密码">
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button onclick="closeResetModal()" style="padding:10px 16px;background:#555;color:#fff;border:none;border-radius:8px">取消</button>
+      <button onclick="doReset()" style="padding:10px 16px;background:#ef4444;color:#fff;border:none;border-radius:8px">确认</button>
     </div>
   </div>
 </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: false }
-});
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 let myId = null;
 
 // 进入房间
@@ -348,29 +299,15 @@ async function enterRoom() {
 
   const timeLimit = new Date(Date.now() - 30000).toISOString();
   const { data: exist } = await supabaseClient
-    .from('players')
-    .select('*')
-    .eq('player_id', id)
-    .gt('last_seen', timeLimit)
-    .maybeSingle();
+    .from('players').select('*').eq('player_id', id).gt('last_seen', timeLimit).maybeSingle();
 
-  if (exist) {
-    err.innerText = '编号已被占用';
-    return;
-  }
+  if (exist) { err.innerText = '编号已被占用'; return; }
 
   myId = id;
-  await supabaseClient.from('players').upsert({
-    player_id: id,
-    last_seen: new Date().toISOString()
-  });
+  await supabaseClient.from('players').upsert({ player_id: id, last_seen: new Date().toISOString() });
 
-  // 心跳保活
   setInterval(() => {
-    supabaseClient.from('players').upsert({
-      player_id: id,
-      last_seen: new Date().toISOString()
-    });
+    supabaseClient.from('players').upsert({ player_id: id, last_seen: new Date().toISOString() });
   }, 10000);
 
   document.getElementById('login').style.display = 'none';
@@ -378,10 +315,7 @@ async function enterRoom() {
   document.getElementById('myId').innerText = '我是：' + myId;
 
   await supabaseClient.from('messages').insert({
-    type: 'system',
-    from_id: 'system',
-    to_id: 'all',
-    content: myId + ' 进入了房间'
+    type: 'system', from_id: 'system', to_id: 'all', content: myId + ' 进入了房间'
   });
 
   setInterval(loadMessages, 600);
@@ -390,9 +324,7 @@ async function enterRoom() {
 // 加载消息
 async function loadMessages() {
   const { data: msgList } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .order('created_at', { ascending: true });
+    .from('messages').select('*').order('created_at', { ascending: true });
 
   const dom = document.getElementById('messages');
   let html = '';
@@ -402,23 +334,11 @@ async function loadMessages() {
       html += `<div class="msg-system">${m.content}</div>`;
       return;
     }
-
     const numText = m.from_id.replace('号', '');
-
     if (m.from_id === myId) {
-      html += `
-        <div class="msg-me">
-          <div class="avatar">${numText}</div>
-          <div class="bubble">${m.content}</div>
-        </div>
-      `;
+      html += `<div class="msg-me"><div class="avatar">${numText}</div><div class="bubble">${m.content}</div></div>`;
     } else {
-      html += `
-        <div class="msg-other">
-          <div class="avatar">${numText}</div>
-          <div class="bubble">${m.content}</div>
-        </div>
-      `;
+      html += `<div class="msg-other"><div class="avatar">${numText}</div><div class="bubble">${m.content}</div></div>`;
     }
   });
 
@@ -433,10 +353,7 @@ async function sendMessage() {
   if (!content || !myId) return;
 
   await supabaseClient.from('messages').insert({
-    type: 'public',
-    from_id: myId,
-    to_id: 'all',
-    content: content
+    type: 'public', from_id: myId, to_id: 'all', content: content
   });
 
   input.value = '';
@@ -454,17 +371,12 @@ function closeResetModal() {
 // 重置房间
 async function doReset() {
   const pwd = document.getElementById('resetPwd').value.trim();
-  if (pwd !== ADMIN_PWD) {
-    alert('密码错误');
-    return;
-  }
-  if (!confirm('确认要重置房间吗？')) return;
+  if (pwd !== ADMIN_PWD) { alert('密码错误'); return; }
+  if (!confirm('确定重置房间？')) return;
 
-  await supabaseClient.from('messages').delete().neq('id', 0);
-  await supabaseClient.from('players').delete().neq('id', 0);
-
-  alert('房间已重置');
-  closeResetModal();
+  await supabaseClient.from('messages').delete().neq('id',0);
+  await supabaseClient.from('players').delete().neq('id',0);
+  alert('重置成功');
   location.reload();
 }
 </script>

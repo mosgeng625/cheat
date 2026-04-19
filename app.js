@@ -3,20 +3,15 @@ const SUPABASE_URL = 'https://mronesaaytjjtuhwvzouj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheXRqanR1aHd2em91aiIsImlhdCI6MTc0NDk3NTY2MiwiZXhwIjoxOTYwNTUxNjYyfQ.8Z4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4y4';
 const ADMIN_PASSWORD = 'admin123';
 
-// 全局变量（只声明一次！）
+// 全局变量
 let supabase;
 let myId = null;
 let currentPrivateTarget = null;
 
-// 初始化Supabase客户端（单例模式）
-if (!window.supabaseInstance) {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false }
-  });
-  window.supabaseInstance = supabase;
-} else {
-  supabase = window.supabaseInstance;
-}
+// 初始化
+supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false }
+});
 
 // 登录函数
 window.enterRoom = async function() {

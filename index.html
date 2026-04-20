@@ -377,57 +377,47 @@ async function login() {
   checkReqTimer = setInterval(checkPrivateRequest, 600);
 }
 
+// 发起私聊：直接进入房间，倒计时5秒
 async function sendPrivateRequest(to) {
-  await supabaseClient.from('private_requests').delete().or(`from_id.eq('${me}'),to_id.eq('${me}')`);
-  await supabaseClient.from('private_requests').insert([{
-    from_id: me, to_id: to, status: 'pending'
-  }]);
-
-  enterPrivateAtMsgId = lastLoadedId;
-  mode = 'private';
+  // 直接进入房间
+  mode = "private";
   privatePartner = to;
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateStatus').innerText = `（等待对方同意：${to}）`;
   lastLoadedId = 0;
   loadedMessageIds.clear();
-  document.getElementById('messages').innerHTML = '';
+  document.getElementById("messages").innerHTML = "";
+  document.getElementById("endPrivateBtn").style.display = "inline-block";
+  document.getElementById("privateStatus").innerText = `（私聊中：${to}）`;
 
-  let waitTime = 5;
-  let timeoutTimer = setInterval(() => {
-    waitTime--;
-    document.getElementById('privateStatus').innerText = `（等待对方同意：${to}，${waitTime}秒）`;
-    if (waitTime <= 0) {
-      clearInterval(timeoutTimer); clearInterval(privateAcceptTimer); clearInterval(privateRejectTimer);
-      endPrivate();
-      alert(to + ' 未接受私聊，已自动退出');
+  // 倒计时5秒
+  let count = 5;
+  let timer = setInterval(() => {
+    count--;
+    document.getElementById("privateStatus").innerText = `（私聊中：${to}，${count}秒）`;
+    if (count <= 0) {
+      clearInterval(timer);
+      endPrivate(); // 超时退出房间
     }
   }, 1000);
 
-  clearInterval(privateAcceptTimer);
-  privateAcceptTimer = setInterval(async () => {
-    const { data: req } = await supabaseClient
-      .from('private_requests').select('*')
-      .eq('from_id', me).eq('to_id', to).eq('status', 'accepted').maybeSingle();
-    if (req) {
-      clearInterval(timeoutTimer); clearInterval(privateAcceptTimer); clearInterval(privateRejectTimer);
-      document.getElementById('privateStatus').innerText = `（私聊中：${to}）`;
-    }
-  }, 600);
+  // 对方拒绝 → 立刻退出房间
+  let rejectTimer = setInterval(async () => {
+    const { data } = await supabaseClient
+      .from("private_requests")
+      .select("*")
+      .eq("from_id", me)
+      .eq("to_id", to)
+      .eq("status", "rejected")
+      .maybeSingle();
 
-  clearInterval(privateRejectTimer);
-  privateRejectTimer = setInterval(async () => {
-    const { data: req } = await supabaseClient
-      .from('private_requests').select('*')
-      .eq('from_id', me).eq('to_id', to).eq('status', 'rejected').maybeSingle();
-    if (req) {
-      clearInterval(timeoutTimer); clearInterval(privateAcceptTimer); clearInterval(privateRejectTimer);
+    if (data) {
+      clearInterval(timer);
+      clearInterval(rejectTimer);
       endPrivate();
-      alert(to + ' 拒绝了私聊');
+      alert(to + " 拒绝了私聊");
     }
   }, 600);
-
-  window.privateTimeoutTimer = timeoutTimer;
 }
+
 
 async function checkPrivateRequest() {
   if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;

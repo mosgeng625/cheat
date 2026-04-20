@@ -327,6 +327,7 @@ let checkReqTimer = null;
 let watchPartnerExitTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 初始化 Supabase（修复了上一版的语法错误）
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   document.getElementById('loginBtn').addEventListener('click', login);
@@ -340,24 +341,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
   document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
 
-  // 打开/关闭快捷菜单
+  // 快捷菜单开关
   document.getElementById('quickBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     const menu = document.getElementById('quickMenu');
     menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
   });
 
-  // 点击快捷项 → 填入输入框
+  // 快捷项填入输入框
   document.getElementById('quickMenu').addEventListener('click', (e) => {
     e.stopPropagation();
     const btn = e.target.closest('button[data-text]');
     if (!btn) return;
-    const text = btn.dataset.text;
-    document.getElementById('msgInput').value = text; // 填入
-    document.getElementById('quickMenu').style.display = 'none'; // 关闭菜单
+    document.getElementById('msgInput').value = btn.dataset.text;
+    document.getElementById('quickMenu').style.display = 'none';
   });
 
-  // 点外面关闭菜单
+  // 点击外部关闭菜单
   document.addEventListener('click', (e) => {
     const menu = document.getElementById('quickMenu');
     const btn = document.getElementById('quickBtn');
@@ -381,18 +381,22 @@ async function login() {
   v = Math.min(8, Math.max(1, v));
   me = v + '号';
 
-  await supabaseClient.from('players').upsert({
-    player_id: me,
-    status: 'online',
-    is_private_chat_with: null
-  });
+  try {
+    await supabaseClient.from('players').upsert({
+      player_id: me,
+      status: 'online',
+      is_private_chat_with: null
+    }, { onConflict: 'player_id' });
 
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('myInfo').innerText = '我是：' + me;
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('myInfo').innerText = '我是：' + me;
 
-  loadMsgTimer = setInterval(loadNewMessages, 300);
-  checkReqTimer = setInterval(checkPrivateRequest, 500);
+    loadMsgTimer = setInterval(loadNewMessages, 300);
+    checkReqTimer = setInterval(checkPrivateRequest, 500);
+  } catch (err) {
+    alert('登录失败：' + err.message);
+  }
 }
 
 function togglePrivatePanel() {
@@ -475,6 +479,7 @@ async function watchPartnerExit() {
 async function endPrivate() {
   if (!privatePartner) return;
   const exPartner = privatePartner;
+
   if (watchPartnerExitTimer) clearInterval(watchPartnerExitTimer);
 
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
@@ -492,12 +497,7 @@ function forceExitPrivate() {
 }
 
 async function loadNewMessages() {
-  const { data: list } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .gt('id', lastLoadedId)
-    .order('created_at', { ascending: true });
-
+  const { data: list } = await supabaseClient.from('messages').select('*').gt('id', lastLoadedId).order('created_at', { ascending: true });
   if (!list || list.length === 0) return;
 
   const dom = document.getElementById('messages');

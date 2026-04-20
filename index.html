@@ -341,6 +341,29 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('acceptBtn').onclick = acceptPrivate;
   document.getElementById('rejectBtn').onclick = rejectPrivate;
 
+  // 修复：加号展开菜单
+  const quickAddBtn = document.getElementById('quickAddBtn');
+  const quickMenu = document.getElementById('quickMenu');
+  quickAddBtn.onclick = (e) => {
+    e.stopPropagation();
+    quickMenu.style.display = quickMenu.style.display === 'flex' ? 'none' : 'flex';
+  };
+  document.body.onclick = () => {
+    quickMenu.style.display = 'none';
+  };
+
+  // 修复：菜单点击发起私聊
+  document.querySelectorAll('#quickMenu button').forEach(btn => {
+    btn.onclick = () => {
+      const txt = btn.dataset.t;
+      const target = txt.match(/(\d+号)/)?.[1];
+      if (target && target !== me) {
+        sendPrivateRequest(target);
+        quickMenu.style.display = 'none';
+      }
+    };
+  });
+
   document.getElementById('messages').onclick = e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -427,7 +450,7 @@ function endPrivate() {
   document.getElementById('endPrivateBtn').style.display = 'none';
 }
 
-// 加载消息（修复私聊显示）
+// 加载消息
 async function loadNewMessages() {
   if (!me) return;
 
@@ -480,7 +503,7 @@ async function loadNewMessages() {
   dom.scrollTop = dom.scrollHeight;
 }
 
-// 修复发送消息BUG
+// 修复：发送（群聊+私聊都正常）
 async function send() {
   const txt = document.getElementById('msgInput').value.trim();
   if (!txt || !me) return;

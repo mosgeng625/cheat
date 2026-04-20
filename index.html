@@ -266,8 +266,6 @@ let supabaseClient;
 let me = null;
 let mode = "group";
 let privatePartner = null;
-
-// 全局只维护一套已加载消息 ID，切换模式不清空
 let lastLoadedId = 0;
 let loadedIds = new Set();
 
@@ -313,6 +311,7 @@ async function login() {
   setInterval(loadMessages, 300);
   setInterval(checkPrivateRequest, 500);
   setInterval(watchMySentRequest, 500);
+  setInterval(watchPartnerExit, 500);
   setInterval(refreshPrivateStatusPanel, 800);
   setInterval(updateMyUiStatus, 800);
 }
@@ -408,27 +407,41 @@ async function rejectPrivate() {
   document.getElementById('privateModal').style.display = 'none';
 }
 
-// ====================== 核心修复：退出私聊不清空消息记录 ======================
+// ======================================
+// 核心修复：一方退出，另一方自动退出
+// ======================================
+async function watchPartnerExit() {
+  if (mode !== 'private' || !privatePartner) return;
+  const { data: partner } = await supabaseClient.from('players').select('status').eq('player_id', privatePartner).single();
+  if (!partner || partner.status !== 'in_private') {
+    forceExitPrivate();
+  }
+}
+
 async function endPrivate() {
   if (!privatePartner) return;
 
-  // 只改自己状态，不改对方，实现各自手动退出
+  // 把自己和对方的状态都改成 online
   await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
+  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', privatePartner);
 
-  // 关闭自己的请求，防止重复进入
+  // 关闭所有相关请求
   await supabaseClient.from('private_requests')
     .update({ status: 'closed' })
-    .eq('from_id', me)
-    .eq('to_id', privatePartner);
+    .or(`from_id.eq.${me},to_id.eq.${me},from_id.eq.${privatePartner},to_id.eq.${privatePartner}`);
 
+  forceExitPrivate();
+}
+
+function forceExitPrivate() {
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
-
-  // 不清空 loadedIds，所以公屏消息不会重复加载
 }
 
-// ====================== 消息永不重复 ======================
+// ======================================
+// 核心修复：消息永不重复
+// ======================================
 async function loadMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
@@ -436,24 +449,21 @@ async function loadMessages() {
     .order('id', { ascending: true });
 
   if (!list) return;
-
   const dom = document.getElementById('messages');
   let updated = false;
 
-  list.forEach(m => {
-    if (loadedIds.has(m.id)) return;
+  for (const m of list) {
+    if (loadedIds.has(m.id)) continue;
 
-    // 群聊 / 私聊 过滤
-    if (mode === 'group' && m.type !== 'public') return;
+    if (mode === 'group' && m.type !== 'public') continue;
     if (mode === 'private') {
-      const isPrivateChat =
+      const isBetween =
         (m.from_id === me && m.to_id === privatePartner) ||
         (m.from_id === privatePartner && m.to_id === me);
-      if (!isPrivateChat || m.type !== 'private') return;
+      if (!isBetween || m.type !== 'private') continue;
     }
 
-    // 插入消息
-    let html;
+    let html = '';
     if (m.type === 'system') {
       html = `<div class="sys">${m.content}</div>`;
     } else {
@@ -468,13 +478,10 @@ async function loadMessages() {
 
     dom.insertAdjacentHTML('beforeend', html);
     loadedIds.add(m.id);
-    lastLoadedId = Math.max(lastLoadedId, m.id);
     updated = true;
-  });
-
-  if (updated) {
-    dom.scrollTop = dom.scrollHeight;
   }
+
+  if (updated) dom.scrollTop = dom.scrollHeight;
 }
 
 async function send() {
@@ -487,7 +494,7 @@ async function send() {
     content: c,
     type: mode === 'group' ? 'public' : 'private',
     to_id: mode === 'group' ? 'all' : privatePartner
-  }];
+  }]);
   i.value = '';
 }
 

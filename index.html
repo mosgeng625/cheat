@@ -384,20 +384,47 @@ async function login() {
   checkReqTimer = setInterval(checkPrivateRequest, 600);
 }
 
-// 发起私聊（修复版：发起方自动进入私聊）
+// 发起私聊（你要的逻辑：立刻进私聊 + 5秒超时自动退出 + 可手动退出）
 async function sendPrivateRequest(to) {
-  // 先清空旧请求，避免冲突
+  // 先清掉旧请求，避免冲突
   await supabaseClient.from('private_requests')
     .delete()
     .or(`from_id.eq('${me}'),to_id.eq('${me}')`);
 
-  // 发起新申请
+  // 插入新请求
   await supabaseClient.from('private_requests').insert([{
     from_id: me, to_id: to, status: 'pending'
   }]);
-  alert('已向 ' + to + ' 发起私聊申请，对方同意后自动进入私聊');
 
-  // 发起方监听同意（核心修复）
+  // ==============================================
+  // 👇 核心：发起方 立刻 进入私聊（你要的效果）
+  // ==============================================
+  mode = 'private';
+  privatePartner = to;
+  document.getElementById('endPrivateBtn').style.display = 'inline-block';
+  document.getElementById('privateStatus').innerText = `（等待对方同意：${to}）`;
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+  document.getElementById('messages').innerHTML = '';
+
+  // 倒计时 5 秒，没同意就自动退出
+  let waitTime = 5;
+  let timeoutTimer = setInterval(() => {
+    waitTime--;
+    document.getElementById('privateStatus').innerText = `（等待对方同意：${to}，${waitTime}秒）`;
+    if (waitTime <= 0) {
+      clearInterval(timeoutTimer);
+      clearInterval(privateAcceptTimer);
+      // 超时自动退出
+      mode = 'group';
+      privatePartner = null;
+      document.getElementById('endPrivateBtn').style.display = 'none';
+      document.getElementById('privateStatus').innerText = '';
+      alert(to + ' 未接受私聊，已自动退出');
+    }
+  }, 1000);
+
+  // 监听对方是否同意
   clearInterval(privateAcceptTimer);
   privateAcceptTimer = setInterval(async () => {
     const { data: req } = await supabaseClient
@@ -409,18 +436,17 @@ async function sendPrivateRequest(to) {
       .maybeSingle();
 
     if (req) {
+      // 对方同意 → 清除倒计时，正常私聊
+      clearInterval(timeoutTimer);
       clearInterval(privateAcceptTimer);
-      // 发起方强制进入私聊
-      mode = 'private';
-      privatePartner = to;
-      document.getElementById('endPrivateBtn').style.display = 'inline-block';
       document.getElementById('privateStatus').innerText = `（私聊中：${to}）`;
-      lastLoadedId = 0;
-      loadedMessageIds.clear();
-      document.getElementById('messages').innerHTML = '';
     }
   }, 600);
+
+  // 把超时计时器绑到当前私聊，手动结束时会清掉
+  window.privateTimeoutTimer = timeoutTimer;
 }
+
 
 
 async function checkPrivateRequest() {
@@ -461,14 +487,18 @@ function rejectPrivate() {
 }
 
 async function endPrivate() {
+  // 清理所有定时器
+  clearInterval(privateAcceptTimer);
+  if (window.privateTimeoutTimer) clearInterval(window.privateTimeoutTimer);
+  
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
   document.getElementById('privateStatus').innerText = '';
   lastLoadedId = 0;
   loadedMessageIds.clear();
-  clearInterval(privateAcceptTimer);
 }
+
 
 async function loadNewMessages() {
   if (isLoading) return;

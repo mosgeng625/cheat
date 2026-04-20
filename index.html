@@ -145,13 +145,13 @@
   }
   .msg.me .bubble { background: #07c160; color: #fff; }
 
-  /* 输入区样式微调，保证美观 */
   #inputArea {
     display: flex;
     padding: 10px;
     background: #252a33;
     gap: 6px;
     align-items: center;
+    position: relative;
   }
   #msgInput {
     flex: 1;
@@ -162,22 +162,18 @@
     color: #fff;
     outline: none;
   }
-  #targetSelect {
-    padding: 10px 8px;
-    border-radius: 20px;
-    border: none;
-    background: #1a1d24;
-    color: #fff;
-    outline: none;
-  }
   #quickBtn {
-    padding: 10px 12px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
     background: #6366f1;
     color: #fff;
-    border: none;
-    border-radius: 20px;
+    font-size: 18px;
     cursor: pointer;
-    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   #sendBtn {
     padding: 10px 16px;
@@ -186,6 +182,33 @@
     border: none;
     border-radius: 20px;
     cursor: pointer;
+  }
+
+  /* 快捷菜单面板 */
+  #quickPanel {
+    position: absolute;
+    bottom: 60px;
+    left: 10px;
+    background: #252a33;
+    border-radius: 12px;
+    padding: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 180px;
+    z-index: 999;
+  }
+  #quickPanel button {
+    background: #333;
+    color: #fff;
+    border: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+  }
+  #quickPanel button:hover {
+    background: #6366f1;
   }
 
   .modal {
@@ -250,19 +273,22 @@
 
   <div id="messages"></div>
 
-  <!-- 输入区：增加下拉选择 + 快捷按钮 -->
   <div id="inputArea">
-    <select id="targetSelect">
-      <option value="1">1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-    </select>
-    <button id="quickBtn">快捷：我要和X号私聊</button>
+    <!-- + 号快捷按钮 -->
+    <button id="quickBtn">+</button>
+
+    <!-- 快捷菜单 -->
+    <div id="quickPanel">
+      <button data-msg="我要和 1 号私聊">我要和 1 号私聊</button>
+      <button data-msg="我要和 2 号私聊">我要和 2 号私聊</button>
+      <button data-msg="我要和 3 号私聊">我要和 3 号私聊</button>
+      <button data-msg="我要和 4 号私聊">我要和 4 号私聊</button>
+      <button data-msg="我要和 5 号私聊">我要和 5 号私聊</button>
+      <button data-msg="我要和 6 号私聊">我要和 6 号私聊</button>
+      <button data-msg="我要和 7 号私聊">我要和 7 号私聊</button>
+      <button data-msg="我要和 8 号私聊">我要和 8 号私聊</button>
+    </div>
+
     <input id="msgInput" placeholder="输入消息...">
     <button id="sendBtn">发送</button>
   </div>
@@ -319,8 +345,26 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
   document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
 
-  // 快捷私聊按钮
-  document.getElementById('quickBtn').addEventListener('click', sendQuickPrivateMsg);
+  // + 号开关快捷面板
+  const quickBtn = document.getElementById('quickBtn');
+  const quickPanel = document.getElementById('quickPanel');
+  quickBtn.addEventListener('click', () => {
+    quickPanel.style.display = quickPanel.style.display === 'flex' ? 'none' : 'flex';
+  });
+
+  // 点击快捷语句发送
+  document.querySelectorAll('#quickPanel button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.msg;
+      supabaseClient.from('messages').insert([{
+        from_id: me,
+        content: text,
+        type: 'public',
+        to_id: 'all'
+      }]);
+      quickPanel.style.display = 'none';
+    });
+  });
 
   document.getElementById('messages').addEventListener('click', e => {
     const ava = e.target.closest('.avatar');
@@ -330,19 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sendPrivateRequest(target);
   });
 });
-
-// 快捷发送：我要和 X 号私聊
-function sendQuickPrivateMsg() {
-  const target = document.getElementById('targetSelect').value;
-  const text = `我要和 ${target} 号私聊`;
-
-  supabaseClient.from('messages').insert([{
-    from_id: me,
-    content: text,
-    type: 'public',
-    to_id: 'all'
-  }]);
-}
 
 async function login() {
   let v = document.getElementById('playerId').value.trim() || '1';
@@ -396,8 +427,7 @@ async function checkPrivateRequest() {
   if (mode === 'private') return;
   if (document.getElementById('privateModal').style.display === 'flex') return;
 
-  const { data: reqs } = await supabaseClient
-    .from('private_requests')
+  const { data: reqs } = await supabaseClient.from('private_requests')
     .select('*')
     .eq('to_id', me)
     .eq('status', 'pending')
@@ -463,8 +493,7 @@ function forceExitPrivate() {
 }
 
 async function loadNewMessages() {
-  const { data: list } = await supabaseClient
-    .from('messages')
+  const { data: list } = await supabaseClient.from('messages')
     .select('*')
     .gt('id', lastLoadedId)
     .order('created_at', { ascending: true });

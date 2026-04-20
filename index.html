@@ -574,8 +574,27 @@ async function send() {
   document.getElementById('msgInput').value = '';
 }
 
+// ====================== ✅ 修复：忙线判断 + 全局私聊列表 ======================
+async function isUserBusy(uid) {
+  const { data } = await supabaseClient
+    .from('private_requests')
+    .select('*')
+    .or(`from_id.eq.${uid},to_id.eq.${uid}`)
+    .eq('status', 'accepted')
+    .maybeSingle();
+  return !!data;
+}
+
 async function sendPrivateRequest(to) {
   if (!myRealId || !to) return;
+
+  // ✅ 先判断对方是否正在私聊
+  const busy = await isUserBusy(to);
+  if (busy) {
+    alert(to.replace(prefix, '') + " 正在私聊中，忙线无法申请");
+    return;
+  }
+
   clearAllTimers();
   await supabaseClient.from('private_requests').delete().or(`from_id.eq.${myRealId},to_id.eq.${myRealId}`);
   mode = 'private'; privatePartner = to;
@@ -676,6 +695,35 @@ function clearAllTimers(){
   clearInterval(privateWaitTimer); clearInterval(privateCheckTimer); clearInterval(watchExitTimer);
 }
 
+// ====================== ✅ 修复：全局私聊状态显示 ======================
+async function loadActivePrivateList() {
+  if (!prefix) return;
+  try {
+    const { data } = await supabaseClient
+      .from('private_requests')
+      .select('*')
+      .eq('status', 'accepted')
+      .like('from_id', prefix + '%');
+
+    const list = document.getElementById('privateList');
+    if (!data || data.length === 0) {
+      list.innerText = '当前房间：无任何人私聊';
+      return;
+    }
+
+    const lines = [];
+    data.forEach(r => {
+      const a = r.from_id.replace(prefix, '');
+      const b = r.to_id.replace(prefix, '');
+      lines.push(a + ' ↔ ' + b);
+    });
+
+    list.innerText = '正在私聊：\n' + lines.join('\n');
+  } catch (e) {
+    document.getElementById('privateList').innerText = '加载失败';
+  }
+}
+
 function refreshPrivatePanel() {
   if (document.getElementById('privatePanel').style.display === 'block') {
     loadActivePrivateList();
@@ -686,34 +734,12 @@ function togglePrivatePanel() {
   const panel = document.getElementById('privatePanel');
   const btn = document.getElementById('togglePrivateBtn');
   if (panel.style.display === 'block') {
-    panel.style.display = 'none'; btn.innerText = '展开私聊状态';
+    panel.style.display = 'none';
+    btn.innerText = '展开私聊状态';
   } else {
-    panel.style.display = 'block'; btn.innerText = '收起私聊状态';
+    panel.style.display = 'block';
+    btn.innerText = '收起私聊状态';
     loadActivePrivateList();
-  }
-}
-
-async function loadActivePrivateList() {
-  if (!myRealId) return;
-  try {
-    const { data } = await supabaseClient
-      .from('private_requests')
-      .select('*')
-      .or(`from_id.eq.${myRealId},to_id.eq.${myRealId}`)
-      .eq('status', 'accepted');
-
-    const list = document.getElementById('privateList');
-    if (!data || data.length === 0) { list.innerText = '当前：未在私聊中'; return; }
-    const partners = new Set();
-    data.forEach(r => {
-      let a = r.from_id.replace(prefix, '');
-      let b = r.to_id.replace(prefix, '');
-      if (r.from_id === myRealId) partners.add(b);
-      if (r.to_id === myRealId) partners.add(a);
-    });
-    list.innerText = '私聊中：' + Array.from(partners).join('、');
-  } catch (e) {
-    document.getElementById('privateList').innerText = '加载失败';
   }
 }
 

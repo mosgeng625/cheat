@@ -17,9 +17,50 @@
     max-width: 500px;
     margin: 0 auto;
   }
-  #login {
+  /* 新增模式选择样式 */
+  #modeSelect {
     height: 100vh;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    gap: 20px;
+  }
+  .mode-card {
+    background: #252a33;
+    padding: 40px 30px;
+    border-radius: 20px;
+    width: 100%;
+    text-align: center;
+  }
+  .mode-card h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #fff;
+  }
+  .mode-btn {
+    width: 100%;
+    padding: 12px;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  #login {
+    height: 100vh;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+  }
+  #nicknameLogin {
+    height: 100vh;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 0 20px;
@@ -50,7 +91,17 @@
     text-align: center;
     margin-bottom: 15px;
   }
-  #loginBtn {
+  #nicknameInput {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: #2d323d;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  #loginBtn, #nicknameLoginBtn {
     width: 100%;
     padding: 12px;
     background: #07c160;
@@ -77,6 +128,7 @@
     color: #07c160;
     font-size: 12px;
     margin-left: 8px;
+    display: none; /* 隐藏私聊状态文字 */
   }
   #togglePrivateBtn {
     background: #444;
@@ -86,13 +138,14 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
+    display: none; /* 隐藏私聊面板切换按钮 */
   }
   #privatePanel {
     background: #1d1f23;
     padding: 8px 14px;
     font-size: 13px;
     color: #ccc;
-    display: none;
+    display: none; /* 永久隐藏私聊面板 */
     border-bottom: 1px solid #333;
   }
   #privateList { line-height: 1.5; }
@@ -137,6 +190,7 @@
     cursor: pointer;
     flex-shrink: 0;
   }
+  /* 无间道模式头像显示规则：取名字第一个字/字符 */
   .bubble {
     background: #2d323d;
     padding: 8px 12px;
@@ -148,6 +202,7 @@
     font-size: 10px;
     color: #6366f1;
     margin-left: 4px;
+    /* 保留私聊标签，但不显示谁在私聊 */
   }
   .msg.me .private-tag { color: #fff; }
   #inputArea {
@@ -168,6 +223,8 @@
     font-size: 18px;
     cursor: pointer;
     flex-shrink: 0;
+    /* 无间道模式隐藏快捷按钮 */
+    display: none;
   }
   #quickMenu {
     position: absolute;
@@ -245,12 +302,32 @@
 </head>
 <body>
 
+<!-- 新增模式选择页面 -->
+<div id="modeSelect">
+  <div class="mode-card">
+    <h1>🔞20岁的少年心事🔞</h1>
+    <button class="mode-btn" id="roomModeBtn">房间轮模式</button>
+    <button class="mode-btn" id="spyModeBtn">无间道模式</button>
+  </div>
+</div>
+
+<!-- 原有房间轮登录 -->
 <div id="login">
   <div class="login-card">
-    <h1>🔞20岁的少年心事🔞</h1>
+    <h1>房间轮模式</h1>
     <p>输入 1‑8 进入房间</p>
     <input id="playerId" placeholder="输入编号" maxlength="1">
     <button id="loginBtn">进入房间</button>
+  </div>
+</div>
+
+<!-- 新增无间道模式登录 -->
+<div id="nicknameLogin">
+  <div class="login-card">
+    <h1>无间道模式</h1>
+    <p>输入你的名字（不限长度）</p>
+    <input id="nicknameInput" placeholder="输入名字">
+    <button id="nicknameLoginBtn">进入聊天</button>
   </div>
 </div>
 
@@ -314,6 +391,7 @@ const ADMIN_PWD = "admin123";
 
 let supabaseClient;
 let me = null;
+let currentMode = null; // 新增：记录当前模式（room/spy）
 let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
@@ -326,7 +404,26 @@ let watchExitTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  
+  // 新增：模式选择按钮事件
+  document.getElementById('roomModeBtn').onclick = () => {
+    document.getElementById('modeSelect').style.display = 'none';
+    document.getElementById('login').style.display = 'flex';
+    currentMode = 'room';
+  };
+  document.getElementById('spyModeBtn').onclick = () => {
+    document.getElementById('modeSelect').style.display = 'none';
+    document.getElementById('nicknameLogin').style.display = 'flex';
+    currentMode = 'spy';
+    // 无间道模式显示快捷按钮（如果需要，也可以隐藏）
+    document.getElementById('quickAddBtn').style.display = 'none'; // 无间道模式隐藏快捷按钮
+  };
+
+  // 原有登录事件
   document.getElementById('loginBtn').onclick = login;
+  // 新增：无间道模式登录事件
+  document.getElementById('nicknameLoginBtn').onclick = nicknameLogin;
+  
   document.getElementById('togglePrivateBtn').onclick = togglePrivatePanel;
   document.getElementById('resetBtn').onclick = showResetModal;
   document.getElementById('endPrivateBtn').onclick = endPrivate;
@@ -356,6 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(loadNewMessages, 400);
 });
 
+// 原有房间轮登录函数
 async function login() {
   let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
   v = Math.max(1, Math.min(8, v));
@@ -367,23 +465,38 @@ async function login() {
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
+  // 房间轮模式显示快捷按钮
+  document.getElementById('quickAddBtn').style.display = 'block';
 
   setInterval(checkPrivateRequest, 600);
   refreshPrivatePanel();
 }
 
-// 公屏发送系统消息
-async function sendSystemMessage(content) {
-  await supabaseClient.from('messages').insert([{
-    from_id: '系统',
-    content: content,
-    type: 'public',
-    to_id: 'all'
-  }]);
+// 新增：无间道模式登录函数
+async function nicknameLogin() {
+  let nickname = document.getElementById('nicknameInput').value.trim();
+  if (!nickname) {
+    alert('请输入你的名字');
+    return;
+  }
+  me = nickname;
+  // 插入玩家数据（兼容原有结构）
+  await supabaseClient.from('players').upsert({
+    player_id: me, status: 'online', is_private_chat_with: null
+  }, { onConflict: 'player_id' });
+
+  document.getElementById('nicknameLogin').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('myInfo').innerText = '我是：' + me;
+
+  setInterval(checkPrivateRequest, 600);
+  refreshPrivatePanel();
 }
 
 function refreshPrivatePanel() {
-  loadActivePrivateList();
+  if (document.getElementById('privatePanel').style.display === 'block') {
+    loadActivePrivateList();
+  }
 }
 
 function togglePrivatePanel() {
@@ -399,28 +512,29 @@ function togglePrivatePanel() {
   }
 }
 
-// 修复：显示谁和谁在私聊
 async function loadActivePrivateList() {
   if (!me) return;
   try {
     const { data } = await supabaseClient
       .from('private_requests')
       .select('*')
+      .or(`from_id.eq.${me},to_id.eq.${me}`)
       .eq('status', 'accepted');
 
     const list = document.getElementById('privateList');
     if (!data || data.length === 0) {
-      list.innerText = '当前：无私聊会话';
+      list.innerText = '当前：未在私聊中';
       return;
     }
-
-    let show = [];
+    const partners = new Set();
     data.forEach(r => {
-      show.push(r.from_id + ' ↔ ' + r.to_id);
+      if (r.from_id === me) partners.add(r.to_id);
+      if (r.to_id === me) partners.add(r.from_id);
     });
-    list.innerText = '私聊中：' + show.join(' | ');
+    // 隐藏具体私聊对象，只显示“私聊中”
+    list.innerText = '当前：私聊中';
   } catch (e) {
-    document.getElementById('privateList').innerText = '加载失败';
+    document.getElementById('privateList').innerText = '私聊状态加载失败';
   }
 }
 
@@ -447,12 +561,13 @@ async function sendPrivateRequest(to) {
   let sec = 6;
   privateWaitTimer = setInterval(() => {
     sec--;
-    document.getElementById('privateStatus').innerText = `等待 ${to} 同意（${sec}秒）`;
+    // 隐藏具体等待对象，只显示“等待对方同意”
+    document.getElementById('privateStatus').innerText = `等待对方同意（${sec}秒）`;
     if (sec <= 0) {
       clearInterval(privateWaitTimer);
       clearInterval(privateCheckTimer);
       endPrivate();
-      alert(to + ' 未同意私聊');
+      alert('对方未同意私聊');
     }
   }, 1000);
 
@@ -469,7 +584,8 @@ async function sendPrivateRequest(to) {
       clearInterval(privateCheckTimer);
       privatePartner = to;
       mode = 'private';
-      document.getElementById('privateStatus').innerText = `已与 ${to} 私聊中`;
+      // 隐藏具体私聊对象，只显示“私聊中”
+      document.getElementById('privateStatus').innerText = `私聊中`;
       startWatchExit();
       refreshPrivatePanel();
     }
@@ -488,7 +604,8 @@ async function checkPrivateRequest() {
 
   if (!data || data.length === 0) return;
   window.curPrivateReq = data[0];
-  document.getElementById('modalText').innerText = data[0].from_id + ' 想和你私聊';
+  // 隐藏具体发起者，只显示“有人想和你私聊”
+  document.getElementById('modalText').innerText = '有人想和你私聊';
   document.getElementById('privateModal').style.display = 'flex';
 }
 
@@ -505,11 +622,8 @@ async function acceptPrivate() {
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
-  document.getElementById('privateStatus').innerText = `已与 ${from} 私聊中`;
-  
-  // 进入私聊公屏提示
-  sendSystemMessage(`${me} 和 ${from} 开始私聊`);
-  
+  // 隐藏具体私聊对象，只显示“私聊中”
+  document.getElementById('privateStatus').innerText = `私聊中`;
   startWatchExit();
   refreshPrivatePanel();
 }
@@ -539,21 +653,17 @@ function startWatchExit() {
       clearInterval(watchExitTimer);
       clearInterval(privateWaitTimer);
       clearInterval(privateCheckTimer);
-      const who = privatePartner;
       privatePartner = null;
       mode = 'group';
       document.getElementById('endPrivateBtn').style.display = 'none';
       document.getElementById('privateStatus').innerText = '';
       refreshPrivatePanel();
-      alert(who + ' 已退出私聊，你已返回公聊');
+      alert('对方已退出私聊，你已返回公聊');
     }
   }, 600);
 }
 
 async function endPrivate() {
-  let a = me;
-  let b = privatePartner;
-  
   if (privatePartner) {
     await supabaseClient
       .from('private_requests')
@@ -569,10 +679,6 @@ async function endPrivate() {
   mode = 'group';
   document.getElementById('endPrivateBtn').style.display = 'none';
   document.getElementById('privateStatus').innerText = '';
-  
-  // 退出私聊公屏提示
-  if(a && b) sendSystemMessage(`${a} 和 ${b} 结束私聊`);
-  
   refreshPrivatePanel();
 }
 
@@ -601,15 +707,22 @@ async function loadNewMessages() {
       );
       if (!show) continue;
 
-      if (m.type === 'system' || m.from_id === '系统') {
+      if (m.type === 'system') {
         dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
       } else {
-        const num = m.from_id.replace('号', '');
+        // 区分模式处理头像显示：
+        // 房间轮模式：显示数字；无间道模式：显示名字第一个字/字符
+        let avatarText = '';
+        if (currentMode === 'room') {
+          avatarText = m.from_id.replace('号', '');
+        } else if (currentMode === 'spy') {
+          avatarText = m.from_id.charAt(0) || '?';
+        }
         const isMe = m.from_id === me;
         const tag = m.type === 'private' ? '<span class="private-tag">[私聊]</span>' : '';
         dom.insertAdjacentHTML('beforeend', `
           <div class="msg ${isMe ? 'me' : ''}">
-            <div class="avatar" data-id="${m.from_id}">${num}</div>
+            <div class="avatar" data-id="${m.from_id}">${avatarText}</div>
             <div class="bubble">${m.content}${tag}</div>
           </div>
         `);

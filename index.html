@@ -3,336 +3,167 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>稳定私聊房间</title>
+<title>稳定私聊</title>
 <style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  }
-  body {
-    background: #111318;
-    color: #eee;
-    max-width: 500px;
-    margin: 0 auto;
-  }
-  #login {
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 20px;
-  }
-  .login-card {
-    background: #252a33;
-    padding: 40px 30px;
-    border-radius: 20px;
-    width: 100%;
-    text-align: center;
-  }
-  #playerId {
-    width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: none;
-    background: #2d3233;
-    color: #fff;
-    text-align: center;
-    margin-bottom: 15px;
-  }
-  #loginBtn {
-    width: 100%;
-    padding: 12px;
-    background: #07c160;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  #app {
-    display: none;
-    height: 100vh;
-    flex-direction: column;
-  }
-  #header {
-    background: #252a33;
-    padding: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  #myInfo {
-    font-weight: 500;
-  }
-  #privateStatus {
-    color: #07c160;
-    font-size: 12px;
-    margin-left: 8px;
-  }
-  #endPrivateBtn {
-    background: #ef4444;
-    color: #fff;
-    border: none;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    display: none;
-  }
-  #messages {
-    flex: 1;
-    padding: 10px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .sys {
-    align-self: center;
-    background: #333;
-    color: #aaa;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-  }
-  .msg {
-    display: flex;
-    gap: 8px;
-    max-width: 75%;
-  }
-  .msg.me {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-  }
-  .avatar {
-    width: 34px;
-    height: 34px;
-    background: #555;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  .bubble {
-    background: #2d3233;
-    padding: 8px 12px;
-    border-radius: 8px;
-    line-height: 1.4;
-  }
-  .msg.me .bubble {
-    background: #07c160;
-    color: #fff;
-  }
-  #inputArea {
-    display: flex;
-    padding: 10px;
-    background: #252a33;
-    gap: 6px;
-    align-items: center;
-  }
-  #msgInput {
-    flex: 1;
-    padding: 10px 14px;
-    border-radius: 20px;
-    border: none;
-    background: #1a1d24;
-    color: #fff;
-    outline: none;
-  }
-  #sendBtn {
-    padding: 10px 16px;
-    background: #07c160;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-  }
-  .modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 999;
-    align-items: center;
-    justify-content: center;
-  }
-  .modalBox {
-    background: #252a33;
-    padding: 25px;
-    border-radius: 14px;
-    width: 90%;
-    max-width: 350px;
-    text-align: center;
-  }
-  .btnGroup {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 20px;
-  }
-  .btn {
-    padding: 10px 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .ok {
-    background: #07c160;
-    color: #fff;
-  }
-  .no {
-    background: #555;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui; }
+  body { background: #121212; color: #fff; max-width: 500px; margin: 0 auto; }
+  #login { height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #1e1e1e; padding: 30px; border-radius: 16px; width: 100%; text-align: center; }
+  #uid { width: 100%; padding: 12px; border-radius: 8px; border: none; margin: 10px 0; background: #2a2a2a; color: #fff; text-align: center; }
+  button { padding: 12px; border-radius: 8px; border: none; background: #02c874; color: #fff; font-weight: bold; cursor: pointer; }
+  #app { display: none; height: 100vh; flex-direction: column; }
+  #top { background: #1e1e1e; padding: 14px; display: flex; justify-content: space-between; align-items: center; }
+  #chat { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .msg { display: flex; gap: 8px; max-width: 75%; }
+  .me { align-self: flex-end; flex-direction: row-reverse; }
+  .avatar { width: 32px; height: 32px; background: #333; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; flex-shrink: 0; }
+  .bubble { background: #2a2a2a; padding: 8px 12px; border-radius: 8px; }
+  .me .bubble { background: #02c874; }
+  .tip { align-self: center; background: #333; padding: 4px 10px; border-radius: 12px; font-size: 12px; color: #aaa; }
+  #input { display: flex; padding: 10px; gap: 8px; background: #1e1e1e; }
+  #text { flex: 1; padding: 10px; border-radius: 20px; border: none; background: #2a2a2a; color: #fff; }
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+  .modal .box { background: #1e1e1e; padding: 24px; border-radius: 12px; text-align: center; }
+  .btn-group { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
+  .btn-ok { background: #02c874; }
+  .btn-no { background: #666; }
+  #endPrivate { background: #ff4444; padding: 6px 10px; border-radius: 6px; display: none; }
 </style>
 </head>
 <body>
 
 <div id="login">
-  <div class="login-card">
-    <h1>进入房间</h1>
-    <p>输入 1‑8 号</p>
-    <input id="playerId" placeholder="编号" maxlength="1">
-    <button id="loginBtn">进入</button>
+  <div class="card">
+    <h2>进入房间</h2>
+    <input id="uid" placeholder="输入1-8" maxlength="1">
+    <button onclick="login()">进入</button>
   </div>
 </div>
 
 <div id="app">
-  <div id="header">
-    <span id="myInfo"></span>
-    <span id="privateStatus"></span>
-    <button id="endPrivateBtn">结束私聊</button>
+  <div id="top">
+    <span id="whoami"></span>
+    <span id="privateTip"></span>
+    <button id="endPrivate" onclick="endPrivate()">结束私聊</button>
   </div>
-  <div id="messages"></div>
-  <div id="inputArea">
-    <input id="msgInput" placeholder="输入消息...">
-    <button id="sendBtn">发送</button>
+  <div id="chat"></div>
+  <div id="input">
+    <input id="text" placeholder="输入消息..." onkeypress="if(event.key==='Enter')send()">
+    <button onclick="send()">发送</button>
   </div>
 </div>
 
-<div id="privateModal" class="modal">
-  <div class="modalBox">
+<div class="modal" id="modal">
+  <div class="box">
     <h3 id="modalText"></h3>
-    <div class="btnGroup">
-      <button class="btn ok" id="acceptBtn">同意</button>
-      <button class="btn no" id="rejectBtn">拒绝</button>
+    <div class="btn-group">
+      <button class="btn-ok" onclick="acceptPrivate()">同意</button>
+      <button class="btn-no" onclick="rejectPrivate()">拒绝</button>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
-
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
-});
+const supabase = supabaseClient = supabase.createClient(
+  "https://mronesaayjtjuhwvzouj.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY"
+);
 
 let me = null;
-let mode = "group";
+let mode = "group"; // group / private
 let privateWith = null;
 let lastId = 0;
-let loaded = new Set();
 
-// 每 500ms 拉一次消息
-setInterval(loadMessages, 500);
-// 每 800ms 检查私聊请求
-setInterval(checkRequest, 800);
-
-document.getElementById('loginBtn').onclick = login;
-document.getElementById('sendBtn').onclick = send;
-document.getElementById('msgInput').onkeypress = e => e.key === 'Enter' && send();
-document.getElementById('endPrivateBtn').onclick = endPrivate;
-document.getElementById('acceptBtn').onclick = accept;
-document.getElementById('rejectBtn').onclick = reject;
-document.getElementById('messages').onclick = e => {
-  const ava = e.target.closest('.avatar');
-  if (!ava) return;
-  const target = ava.dataset.id;
-  if (target === me) return;
-  askPrivate(target);
-};
-
-async function login() {
-  let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
-  v = Math.max(1, Math.min(8, v));
+// 登录
+function login() {
+  let v = document.getElementById('uid').value.trim();
+  if (!v || isNaN(v)) v = '1';
+  v = Math.max(1, Math.min(8, +v));
   me = v + '号';
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('myInfo').innerText = '我是：' + me;
+  document.getElementById('whoami').innerText = '我是：' + me;
 }
 
-// 发起私聊
-async function askPrivate(to) {
-  await supabase.from('private_requests').delete().or(`from_id.eq.${me},to_id.eq.${me}`);
-  await supabase.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
-  mode = 'private';
-  privateWith = to;
-  lastId = 0;
-  loaded.clear();
-  document.getElementById('messages').innerHTML = '';
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateStatus').innerText = `等待 ${to} 同意`;
-}
-
-// 检查是否有人请求私聊
-async function checkRequest() {
+// 点击头像发起私聊
+window.startPrivate = async function(target) {
   if (mode === 'private') return;
+  privateWith = target;
+  mode = 'private';
+  lastId = 0;
+  document.getElementById('chat').innerHTML = '';
+  document.getElementById('privateTip').innerText = `等待 ${target} 同意`;
+  document.getElementById('endPrivate').style.display = 'inline-block';
+
+  await supabase.from('private_requests').delete().or(`from_id.eq.${me},to_id.eq.${me}`);
+  await supabase.from('private_requests').insert([
+    { from_id: me, to_id: target, status: 'pending' }
+  ]);
+};
+
+// 检查私聊请求
+setInterval(async () => {
+  if (!me || mode === 'private') return;
   const { data } = await supabase
     .from('private_requests')
     .select('*')
     .eq('to_id', me)
     .eq('status', 'pending')
     .limit(1);
-  if (!data || data.length === 0) return;
-  window.req = data[0];
-  document.getElementById('modalText').innerText = `${data[0].from_id} 想和你私聊`;
-  document.getElementById('privateModal').style.display = 'flex';
-}
+  if (data?.length) {
+    window.curReq = data[0];
+    document.getElementById('modalText').innerText = `${curReq.from_id} 想和你私聊`;
+    document.getElementById('modal').style.display = 'flex';
+  }
+}, 1000);
 
 // 同意私聊
-async function accept() {
-  if (!window.req) return;
-  await supabase.from('private_requests').update({ status: 'accepted' }).eq('id', window.req.id);
-  enterPrivate(window.req.from_id);
-  document.getElementById('privateModal').style.display = 'none';
-}
+async function acceptPrivate() {
+  if (!curReq) return;
+  document.getElementById('modal').style.display = 'none';
 
-// 拒绝私聊
-async function reject() {
-  if (!window.req) return;
-  await supabase.from('private_requests').update({ status: 'rejected' }).eq('id', window.req.id);
-  document.getElementById('privateModal').style.display = 'none';
-}
+  // 标记同意
+  await supabase.from('private_requests')
+    .update({ status: 'accepted' })
+    .eq('id', curReq.id);
 
-// 进入私聊房间
-function enterPrivate(target) {
+  // 发送系统消息：对方已加入（双方都能看到）
+  await supabase.from('messages').insert([{
+    from_id: 'sys',
+    content: `${curReq.from_id} 已加入私聊`,
+    type: 'system',
+    to_id: 'all'
+  }]);
+
+  // 进入私聊
   mode = 'private';
-  privateWith = target;
+  privateWith = curReq.from_id;
   lastId = 0;
-  loaded.clear();
-  document.getElementById('messages').innerHTML = '';
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateStatus').innerText = `私聊中：${target}`;
+  document.getElementById('chat').innerHTML = '';
+  document.getElementById('privateTip').innerText = `私聊中：${privateWith}`;
+  document.getElementById('endPrivate').style.display = 'inline-block';
 }
 
-// 退出私聊
+// 拒绝
+function rejectPrivate() {
+  document.getElementById('modal').style.display = 'none';
+}
+
+// 结束私聊
 function endPrivate() {
   mode = 'group';
   privateWith = null;
   lastId = 0;
-  loaded.clear();
-  document.getElementById('endPrivateBtn').style.display = 'none';
-  document.getElementById('privateStatus').innerText = '';
+  document.getElementById('privateTip').innerText = '';
+  document.getElementById('endPrivate').style.display = 'none';
 }
 
-// 加载消息（稳定版，绝对不会乱）
+// 加载消息
+setInterval(loadMessages, 500);
 async function loadMessages() {
+  if (!me) return;
+
   let q = supabase
     .from('messages')
     .select('*')
@@ -342,39 +173,35 @@ async function loadMessages() {
   if (mode === 'group') {
     q = q.eq('type', 'public');
   } else {
-    // 只看我和对方的私聊消息
-    q = q.eq('type', 'private')
-      .or(`(from_id.eq.${me},to_id.eq.${me})`);
+    // 私聊只看：我发的 / 发给我的
+    q = q.or(`(from_id.eq.${me},to_id.eq.${me})`);
   }
 
   const { data: list } = await q;
   if (!list) return;
 
-  const dom = document.getElementById('messages');
+  const chat = document.getElementById('chat');
   list.forEach(m => {
-    if (loaded.has(m.id)) return;
-    loaded.add(m.id);
-    if (m.id > lastId) lastId = m.id;
+    if (m.id <= lastId) return;
+    lastId = m.id;
 
-    // 系统提示：对方已加入
-    if (m.type === 'system' && mode === 'private' && m.content.includes('已加入')) {
-      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+    if (m.type === 'system') {
+      chat.insertAdjacentHTML('beforeend', `<div class="tip">${m.content}</div>`);
       return;
     }
 
-    const num = m.from_id.replace('号', '');
+    const num = m.from_id.replace('号','');
     const isMe = m.from_id === me;
-    dom.insertAdjacentHTML('beforeend', `
-      <div class="msg ${isMe ? 'me' : ''}">
-        <div class="avatar" data-id="${m.from_id}">${num}</div>
+    chat.insertAdjacentHTML('beforeend', `
+      <div class="msg ${isMe?'me':''}">
+        <div class="avatar" data-id="${m.from_id}" onclick="startPrivate('${m.from_id}')">${num}</div>
         <div class="bubble">${m.content}</div>
       </div>
     `);
   });
+  chat.scrollTop = chat.scrollHeight;
 
-  dom.scrollTop = dom.scrollHeight;
-
-  // 发起方检测：对方同意后自动显示“已加入”
+  // 发起方监听：对方同意后立刻刷新状态
   if (mode === 'private' && privateWith) {
     const { data } = await supabase
       .from('private_requests')
@@ -384,23 +211,14 @@ async function loadMessages() {
       .eq('status', 'accepted')
       .maybeSingle();
     if (data) {
-      document.getElementById('privateStatus').innerText = `私聊中：${privateWith}`;
-      const hasTip = [...document.querySelectorAll('.sys')].some(s => s.innerText.includes(`${privateWith}已加入`));
-      if (!hasTip) {
-        await supabase.from('messages').insert([{
-          from_id: 'sys',
-          content: `${privateWith}已加入`,
-          type: 'system',
-          to_id: 'all'
-        }]);
-      }
+      document.getElementById('privateTip').innerText = `私聊中：${privateWith}`;
     }
   }
 }
 
 // 发送消息
 async function send() {
-  const txt = document.getElementById('msgInput').value.trim();
+  const txt = document.getElementById('text').value.trim();
   if (!txt || !me) return;
   await supabase.from('messages').insert([{
     from_id: me,
@@ -408,7 +226,7 @@ async function send() {
     type: mode === 'group' ? 'public' : 'private',
     to_id: mode === 'group' ? 'all' : privateWith
   }]);
-  document.getElementById('msgInput').value = '';
+  document.getElementById('text').value = '';
 }
 </script>
 </body>

@@ -576,7 +576,7 @@ async function endPrivate() {
   });
 }
 
-// 修复：私聊消息查询，使用兼容的 or() 语法
+// 修复：私聊消息查询使用标准 or 语法
 async function loadNewMessages() {
   if (isLoading) return;
   isLoading = true;
@@ -590,9 +590,9 @@ async function loadNewMessages() {
     if (mode === 'group') {
       query = query.eq('type', 'public');
     } else {
-      // 修复点：使用标准 or 语法
+      // 关键修复：使用标准 or(条件1,条件2) 语法
       query = query.eq('type', 'private')
-        .or(`from_id.eq.${me},to_id.eq.${me}`);
+        .or(`(from_id.eq.${me},to_id.eq.${me})`);
     }
 
     const { data: list } = await query;

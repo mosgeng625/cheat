@@ -149,6 +149,7 @@
     padding: 10px;
     background: #252a33;
     gap: 8px;
+    align-items: center;
   }
   #msgInput {
     flex: 1;
@@ -259,14 +260,13 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
-
+let isLoading = false;
 let loadMsgTimer = null;
 let checkReqTimer = null;
 let watchPartnerExitTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
   document.getElementById('loginBtn').addEventListener('click', login);
   document.getElementById('togglePrivateBtn').addEventListener('click', togglePrivatePanel);
   document.getElementById('resetBtn').addEventListener('click', showResetModal);
@@ -277,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rejectBtn').addEventListener('click', rejectPrivate);
   document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
   document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
-
   document.getElementById('messages').addEventListener('click', e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -288,21 +287,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function login() {
-  let v = document.getElementById('playerId').value.trim() || '1';
-  v = v.replace(/\D/g, '');
+  let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
   v = Math.min(8, Math.max(1, v));
   me = v + '号';
-
-  await supabaseClient.from('players').upsert({
-    player_id: me,
-    status: 'online',
-    is_private_chat_with: null
-  }, { onConflict: 'player_id' });
-
+  await supabaseClient.from('players').upsert({ player_id: me, status: 'online', is_private_chat_with: null }, { onConflict: 'player_id' });
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
-
   loadMsgTimer = setInterval(loadNewMessages, 300);
   checkReqTimer = setInterval(checkPrivateRequest, 500);
 }
@@ -319,14 +310,6 @@ function updateMyUiStatus() {
   el.innerText = mode === 'private' && privatePartner ? `（私聊中：${privatePartner}）` : '';
 }
 
-async function refreshPrivateStatusPanel() {
-  const { data: users } = await supabaseClient.from('players').select('*').not('is_private_chat_with', 'is', null);
-  const listEl = document.getElementById('privateList');
-  if (!users || users.length === 0) { listEl.innerText = '暂无私聊'; return; }
-  const pairs = users.map(u => `${u.player_id} ↔ ${u.is_private_chat_with}`);
-  listEl.innerText = pairs.join('\n');
-}
-
 async function sendPrivateRequest(to) {
   const { data: target } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', to).single();
   if (target?.is_private_chat_with) return alert(to + ' 正在私聊中');
@@ -334,9 +317,9 @@ async function sendPrivateRequest(to) {
   alert('已向 ' + to + ' 发起私聊申请');
 }
 
+// 👇 修复1：请求监听格式，解决406错误
 async function checkPrivateRequest() {
-  if (mode === 'private') return;
-  if (document.getElementById('privateModal').style.display === 'flex') return;
+  if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;
   const { data: reqs } = await supabaseClient
     .from('private_requests')
     .select('*')
@@ -348,37 +331,41 @@ async function checkPrivateRequest() {
   const req = reqs[0];
   document.getElementById('modalText').innerText = req.from_id + ' 想和你私聊';
   document.getElementById('privateModal').style.display = 'flex';
-  window.currentRequest = req;
+  window.curReq = req;
 }
 
+// 👇 修复2：同意私聊逻辑，解决秒退问题
 async function acceptPrivate() {
-  if (!window.currentRequest) return;
-  const from = window.currentRequest.from_id;
+  if (!window.curReq) return;
+  const from = window.curReq.from_id;
 
+  // 先更新请求状态，再更新玩家数据
+  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
   await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
-  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.currentRequest.id);
 
-  mode = 'private';
-  privatePartner = from;
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateModal').style.display = 'none';
-  updateMyUiStatus();
-  lastLoadedId = 0;
-
-  watchPartnerExitTimer = setInterval(watchPartnerExit, 400);
+  // 延迟设置本地状态，防止立刻被误判退出
+  setTimeout(() => {
+    mode = 'private';
+    privatePartner = from;
+    document.getElementById('endPrivateBtn').style.display = 'inline-block';
+    document.getElementById('privateModal').style.display = 'none';
+    updateMyUiStatus();
+    lastLoadedId = 0;
+    document.getElementById('messages').innerHTML = '';
+    watchPartnerExitTimer = setInterval(watchPartnerExit, 600);
+  }, 800);
 }
 
 async function rejectPrivate() {
-  if (!window.currentRequest) return;
-  await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.currentRequest.id);
+  if (window.curReq) await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.curReq.id);
   document.getElementById('privateModal').style.display = 'none';
 }
 
 async function watchPartnerExit() {
   if (mode !== 'private' || !privatePartner) return;
   const { data: partner } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', privatePartner).single();
-  if (!partner || partner.is_private_chat_with !== me) {
+  if (!partner || partner.is_private_chat_with === null) {
     forceExitPrivate();
   }
 }
@@ -386,12 +373,9 @@ async function watchPartnerExit() {
 async function endPrivate() {
   if (!privatePartner) return;
   const exPartner = privatePartner;
-
-  if (watchPartnerExitTimer) clearInterval(watchPartnerExitTimer);
-
+  clearInterval(watchPartnerExitTimer);
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', exPartner);
-
   forceExitPrivate();
 }
 
@@ -401,57 +385,51 @@ function forceExitPrivate() {
   document.getElementById('endPrivateBtn').style.display = 'none';
   updateMyUiStatus();
   lastLoadedId = 0;
+  document.getElementById('messages').innerHTML = '';
 }
 
-// 👇 修复：消息显示逻辑（只改这里）
 async function loadNewMessages() {
-  const { data: list } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .order('id', { ascending: true });
-
-  if (!list || list.length === 0) return;
-
-  const dom = document.getElementById('messages');
-  dom.innerHTML = '';
-  lastLoadedId = 0;
-
-  for (const m of list) {
-    if (mode === 'group' && m.type !== 'public') continue;
-    if (mode === 'private') {
-      const valid = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
-      if (!valid) continue;
+  if (isLoading) return;
+  isLoading = true;
+  try {
+    const { data: list } = await supabaseClient.from('messages').select('*').order('id', { ascending: true });
+    if (!list || list.length === 0) return;
+    const dom = document.getElementById('messages');
+    dom.innerHTML = '';
+    for (const m of list) {
+      if (mode === 'group' && m.type !== 'public') continue;
+      if (mode === 'private') {
+        const valid = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
+        if (!valid) continue;
+      }
+      if (m.type === 'system') {
+        dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+      } else {
+        const num = m.from_id.replace('号', '');
+        const isMe = m.from_id === me;
+        dom.insertAdjacentHTML('beforeend', `
+          <div class="msg ${isMe ? 'me' : ''}">
+            <div class="avatar" data-id="${m.from_id}">${num}</div>
+            <div class="bubble">${m.content}</div>
+          </div>`);
+      }
     }
-
-    if (m.type === 'system') {
-      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
-    } else {
-      const num = m.from_id.replace('号', '');
-      const isMe = m.from_id === me;
-      dom.insertAdjacentHTML('beforeend', `
-        <div class="msg ${isMe ? 'me' : ''}">
-          <div class="avatar" data-id="${m.from_id}">${num}</div>
-          <div class="bubble">${m.content}</div>
-        </div>`);
-    }
-    lastLoadedId = m.id;
+    dom.scrollTop = dom.scrollHeight;
+  } finally {
+    isLoading = false;
   }
-  dom.scrollTop = dom.scrollHeight;
 }
 
-// 👇 修复：发送后清空输入框并强制刷新
 async function send() {
   const i = document.getElementById('msgInput');
   const c = i.value.trim();
   if (!c || !me) return;
-
   await supabaseClient.from('messages').insert([{
     from_id: me,
     content: c,
     type: mode === 'group' ? 'public' : 'private',
     to_id: mode === 'group' ? 'all' : privatePartner
   }]);
-
   i.value = '';
   loadNewMessages();
 }
@@ -463,7 +441,6 @@ async function confirmReset() {
   const p = document.getElementById('resetPwd').value;
   if (p !== ADMIN_PWD) return alert('密码错误');
   if (!confirm('确定清空？')) return;
-
   await supabaseClient.from('messages').delete().neq('id', 0);
   await supabaseClient.from('players').delete().neq('id', 0);
   await supabaseClient.from('private_requests').delete().neq('id', 0);

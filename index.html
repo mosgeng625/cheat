@@ -193,7 +193,6 @@
     gap: 6px;
     width: 170px;
     z-index: 100;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   }
   #quickMenu button {
     background: #383838;
@@ -239,7 +238,7 @@
     cursor: pointer;
   }
   .ok { background: #07c160; color: #fff; }
-  .no { background: #555; color: #fff; }
+  .no { background: #555; }
 </style>
 </head>
 <body>
@@ -259,7 +258,7 @@
       <span id="myInfo"></span>
       <span id="privateStatus"></span>
     </div>
-    <button id="togglePrivateBtn">展开私聊状态</button>
+    <button id="togglePrivateBtn">状态</button>
     <div class="header-right">
       <button id="resetBtn">重置</button>
       <button id="endPrivateBtn">结束私聊</button>
@@ -316,16 +315,17 @@ const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
 
-let supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let me = null;
 let mode = "group";
 let privatePartner = null;
-let lastId = 0;
-let loadedIds = new Set();
 
-let msgInterval = null;
-let reqInterval = null;
-let watchInterval = null;
+// 核心：只记录最后一条消息ID，绝对不重复
+let lastMsgId = 0;
+
+let msgTimer = null;
+let reqTimer = null;
+let watchTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loginBtn').onclick = login;
@@ -339,27 +339,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancelResetBtn').onclick = closeResetModal;
   document.getElementById('confirmResetBtn').onclick = confirmReset;
 
-  // 快捷菜单
+  // 快捷语
   const quickBtn = document.getElementById('quickBtn');
-  const quickMenu = document.getElementById('quickMenu');
+  const menu = document.getElementById('quickMenu');
   quickBtn.onclick = e => {
     e.stopPropagation();
-    quickMenu.style.display = quickMenu.style.display === 'flex' ? 'none' : 'flex';
+    menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
   };
-  quickMenu.onclick = e => {
+  menu.onclick = e => {
     e.stopPropagation();
-    const btn = e.target.closest('[data-text]');
-    if (!btn) return;
-    document.getElementById('msgInput').value = btn.dataset.text;
-    quickMenu.style.display = 'none';
+    const b = e.target.closest('[data-text]');
+    if (!b) return;
+    document.getElementById('msgInput').value = b.dataset.text;
+    menu.style.display = 'none';
   };
   document.onclick = e => {
-    if (!quickBtn.contains(e.target) && !quickMenu.contains(e.target)) {
-      quickMenu.style.display = 'none';
-    }
+    if (!quickBtn.contains(e.target) && !menu.contains(e.target)) menu.style.display = 'none';
   };
 
-  // 点击头像私聊
+  // 头像私聊
   document.getElementById('messages').onclick = e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -375,64 +373,58 @@ async function login() {
   me = v + '号';
 
   await supabase.from('players').upsert({
-    player_id: me,
-    status: 'online',
-    is_private_chat_with: null
+    player_id: me, status: 'online', is_private_chat_with: null
   }, { onConflict: 'player_id' });
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
-  // 只开一个定时器拉消息
-  clearInterval(msgInterval);
-  msgInterval = setInterval(loadMessages, 500);
-  reqInterval = setInterval(checkRequest, 600);
+  // 只开一个消息定时器
+  clearInterval(msgTimer);
+  msgTimer = setInterval(loadOneMessage, 400);
+  reqTimer = setInterval(checkPrivateRequest, 500);
 }
 
-// 加载消息（防重复核心）
-async function loadMessages() {
+// 核心修复：每次只拉最新1条，绝对不重复
+async function loadOneMessage() {
   const { data: list } = await supabase
     .from('messages')
     .select('*')
-    .gt('id', lastId)
-    .order('created_at', { ascending: true });
+    .gt('id', lastMsgId)
+    .order('id', { ascending: true })
+    .limit(1);
 
   if (!list || list.length === 0) return;
+  const m = list[0];
 
-  const dom = document.getElementById('messages');
-  let max = lastId;
+  // 已经加载过，直接跳过
+  if (m.id <= lastMsgId) return;
 
-  for (const m of list) {
-    if (loadedIds.has(m.id)) continue;
-    loadedIds.add(m.id);
-    if (m.id > max) max = m.id;
-
-    // 公聊只看 public
-    if (mode === 'group' && m.type !== 'public') continue;
-
-    // 私聊过滤
-    if (mode === 'private') {
-      if (m.type !== 'private') continue;
-      const toMe = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
-      if (!toMe) continue;
-    }
-
-    if (m.type === 'system') {
-      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
-    } else {
-      const num = m.from_id.replace('号', '');
-      const cls = m.from_id === me ? 'msg me' : 'msg';
-      dom.insertAdjacentHTML('beforeend', `
-        <div class="${cls}">
-          <div class="avatar" data-id="${m.from_id}">${num}</div>
-          <div class="bubble">${m.content}</div>
-        </div>
-      `);
-    }
+  // 公聊/私聊过滤
+  if (mode === 'group' && m.type !== 'public') return;
+  if (mode === 'private') {
+    const isTarget = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
+    if (!isTarget) return;
   }
 
-  lastId = max;
+  // 插入页面
+  const dom = document.getElementById('messages');
+  if (m.type === 'system') {
+    dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+  } else {
+    const num = m.from_id.replace('号', '');
+    const cls = m.from_id === me ? 'msg me' : 'msg';
+    dom.insertAdjacentHTML('beforeend', `
+      <div class="${cls}">
+        <div class="avatar" data-id="${m.from_id}">${num}</div>
+        <div class="bubble">${m.content}</div>
+      </div>
+    `);
+  }
+
+  // 更新ID，永远只认最新一条
+  lastMsgId = m.id;
   dom.scrollTop = dom.scrollHeight;
 }
 
@@ -451,20 +443,20 @@ async function send() {
   i.value = '';
 }
 
-// 私聊逻辑
-function updateMyUi() {
+// 私聊相关
+function updateUi() {
   document.getElementById('privateStatus').innerText =
-    mode === 'private' && privatePartner ? `（私聊中：${privatePartner}）` : '';
+    mode === 'private' && privatePartner ? `（私聊：${privatePartner}）` : '';
 }
 
 async function sendPrivateRequest(to) {
   const { data: t } = await supabase.from('players').select('is_private_chat_with').eq('player_id', to).single();
   if (t?.is_private_chat_with) return alert(to + ' 正在私聊');
   await supabase.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
-  alert('已向 ' + to + ' 发起私聊申请');
+  alert('已向 ' + to + ' 发起申请');
 }
 
-async function checkRequest() {
+async function checkPrivateRequest() {
   if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;
   const { data: reqs } = await supabase
     .from('private_requests')
@@ -474,7 +466,7 @@ async function checkRequest() {
     .limit(1);
   if (!reqs || reqs.length === 0) return;
   const r = reqs[0];
-  document.getElementById('modalText').innerText = r.from_id + ' 想和你私聊';
+  document.getElementById('modalText').innerText = r.from_id + ' 想私聊';
   document.getElementById('privateModal').style.display = 'flex';
   window.curReq = r;
 }
@@ -490,14 +482,13 @@ async function acceptPrivate() {
   privatePartner = f;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
-  updateMyUi();
-  lastId = 0;
-  loadedIds.clear();
+  updateUi();
+  lastMsgId = 0;
 
-  clearInterval(watchInterval);
-  watchInterval = setInterval(async () => {
+  clearInterval(watchTimer);
+  watchTimer = setInterval(async () => {
     const { data: p } = await supabase.from('players').select('is_private_chat_with').eq('player_id', privatePartner).single();
-    if (!p || p.is_private_chat_with !== me) forceExitPrivate();
+    if (!p || p.is_private_chat_with !== me) forceExit();
   }, 500);
 }
 
@@ -509,19 +500,18 @@ function rejectPrivate() {
 async function endPrivate() {
   if (!privatePartner) return;
   const ex = privatePartner;
-  clearInterval(watchInterval);
+  clearInterval(watchTimer);
   await supabase.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
   await supabase.from('players').update({ is_private_chat_with: null }).eq('player_id', ex);
-  forceExitPrivate();
+  forceExit();
 }
 
-function forceExitPrivate() {
+function forceExit() {
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
-  updateMyUi();
-  lastId = 0;
-  loadedIds.clear();
+  updateUi();
+  lastMsgId = 0;
 }
 
 function togglePrivatePanel() {

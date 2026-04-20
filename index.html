@@ -12,7 +12,7 @@
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   body {
-    background: #111338;
+    background: #111318;
     color: #eee;
     max-width: 500px;
     margin: 0 auto;
@@ -401,7 +401,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
 
 let supabaseClient;
@@ -472,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ✅ 在线状态：心跳
+// 心跳保活 每秒一次
 async function heartbeat(){
   if(!myRealId) return;
   await supabaseClient.from('online_users').upsert({
@@ -481,14 +481,14 @@ async function heartbeat(){
   });
 }
 
-// ✅ 退出登录
+// 退出清理
 async function logout(){
   if(!myRealId) return;
   await supabaseClient.from('online_users').delete().eq('id', myRealId);
   clearInterval(heartbeatTimer);
 }
 
-// ✅ 检查号码是否在线
+// ✅ 1秒检测在线：超过1秒没心跳 = 离线
 async function isNumberOnline(uid){
   const { data } = await supabaseClient
     .from('online_users')
@@ -499,7 +499,7 @@ async function isNumberOnline(uid){
   const now = new Date();
   const last = new Date(data.last_active);
   const diff = (now - last) / 1000;
-  return diff < 8;
+  return diff < 1;
 }
 
 function backToModeSelect() {
@@ -517,14 +517,14 @@ function backToModeSelect() {
   document.getElementById('endPrivateBtn').style.display = 'none';
 }
 
-// ✅ 房间轮登录：带在线验证
+// ✅ 核心：房间轮登录 —— 严格拦截第二台设备
 async function login() {
   let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
   v = Math.max(1, Math.min(8, v));
   me = v + '号';
   myRealId = prefix + me;
 
-  // 验证在线
+  // 检查是否在线 → 在线就拦截，不让进
   const online = await isNumberOnline(myRealId);
   if(online){
     alert(me + ' 已在线，无法重复登录！');
@@ -533,13 +533,14 @@ async function login() {
     return;
   }
 
+  // 没在线 → 允许登录
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
   document.getElementById('togglePrivateBtn').style.display = 'inline-block';
   document.getElementById('quickAddBtn').style.display = 'block';
   setInterval(checkPrivateRequest, 600);
-  heartbeatTimer = setInterval(heartbeat, 3000);
+  heartbeatTimer = setInterval(heartbeat, 300);
   heartbeat();
   refreshPrivatePanel();
 }

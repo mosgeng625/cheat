@@ -574,7 +574,6 @@ async function send() {
   document.getElementById('msgInput').value = '';
 }
 
-// ====================== ✅ 修复：忙线判断 + 全局私聊列表 ======================
 async function isUserBusy(uid) {
   const { data } = await supabaseClient
     .from('private_requests')
@@ -588,7 +587,6 @@ async function isUserBusy(uid) {
 async function sendPrivateRequest(to) {
   if (!myRealId || !to) return;
 
-  // ✅ 先判断对方是否正在私聊
   const busy = await isUserBusy(to);
   if (busy) {
     alert(to.replace(prefix, '') + " 正在私聊中，忙线无法申请");
@@ -695,7 +693,6 @@ function clearAllTimers(){
   clearInterval(privateWaitTimer); clearInterval(privateCheckTimer); clearInterval(watchExitTimer);
 }
 
-// ====================== ✅ 修复：全局私聊状态显示 ======================
 async function loadActivePrivateList() {
   if (!prefix) return;
   try {
@@ -746,11 +743,18 @@ function togglePrivatePanel() {
 function showResetModal() { document.getElementById('resetModal').style.display = 'flex'; }
 function closeResetModal() { document.getElementById('resetModal').style.display = 'none'; }
 
+// ✅ 核心修复：彻底清空当前模式，绝不影响另一个模式
 async function confirmReset() {
   if (document.getElementById('resetPwd').value !== ADMIN_PWD) return alert('密码错误');
-  await supabaseClient.from('messages').delete().like('from_id', prefix+'%');
-  await supabaseClient.from('private_requests').delete().like('from_id', prefix+'%');
-  alert('重置成功');
+
+  // 只删除 当前模式（room_ 或 spy_）的所有数据，绝对隔离
+  await supabaseClient.from('messages').delete()
+    .or(`from_id.like.${prefix}%,to_id.like.${prefix}%`);
+    
+  await supabaseClient.from('private_requests').delete()
+    .or(`from_id.like.${prefix}%,to_id.like.${prefix}%`);
+
+  alert('重置成功！当前房间已清空');
   location.reload();
 }
 </script>

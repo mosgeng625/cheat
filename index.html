@@ -327,7 +327,6 @@ let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
 let loadedMessageIds = new Set();
-let isLoading = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -341,18 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('acceptBtn').onclick = acceptPrivate;
   document.getElementById('rejectBtn').onclick = rejectPrivate;
 
-  // 修复：加号展开菜单
+  // + 号菜单（稳定版）
   const quickAddBtn = document.getElementById('quickAddBtn');
   const quickMenu = document.getElementById('quickMenu');
   quickAddBtn.onclick = (e) => {
     e.stopPropagation();
     quickMenu.style.display = quickMenu.style.display === 'flex' ? 'none' : 'flex';
   };
-  document.body.onclick = () => {
-    quickMenu.style.display = 'none';
-  };
+  document.body.onclick = () => { quickMenu.style.display = 'none'; };
 
-  // 修复：菜单点击发起私聊
   document.querySelectorAll('#quickMenu button').forEach(btn => {
     btn.onclick = () => {
       const txt = btn.dataset.t;
@@ -364,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   });
 
+  // 点击头像发起私聊
   document.getElementById('messages').onclick = e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -372,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendPrivateRequest(target);
   };
 
-  setInterval(loadNewMessages, 500);
+  setInterval(loadNewMessages, 600);
   setInterval(checkPrivateRequest, 800);
 });
 
@@ -414,112 +411,4 @@ async function checkPrivateRequest() {
   if (data?.length) {
     window.curReq = data[0];
     document.getElementById('modalText').innerText = `${curReq.from_id} 想和你私聊`;
-    document.getElementById('privateModal').style.display = 'flex';
-  }
-}
-
-// 同意私聊 → 双方同时进入
-async function acceptPrivate() {
-  if (!window.curReq) return;
-  const from = window.curReq.from_id;
-
-  await supabaseClient.from('private_requests')
-    .update({ status: 'accepted' })
-    .eq('id', window.curReq.id);
-
-  document.getElementById('privateModal').style.display = 'none';
-
-  mode = 'private';
-  privatePartner = from;
-  lastLoadedId = 0;
-  loadedMessageIds.clear();
-  document.getElementById('messages').innerHTML = '';
-  document.getElementById('privateStatus').innerText = `私聊中：${from}`;
-}
-
-function rejectPrivate() {
-  document.getElementById('privateModal').style.display = 'none';
-}
-
-function endPrivate() {
-  mode = 'group';
-  privatePartner = null;
-  lastLoadedId = 0;
-  loadedMessageIds.clear();
-  document.getElementById('privateStatus').innerText = '';
-  document.getElementById('endPrivateBtn').style.display = 'none';
-}
-
-// 加载消息
-async function loadNewMessages() {
-  if (!me) return;
-
-  // 发起方监听同意
-  if (mode === 'pending_private' && privatePartner) {
-    const { data } = await supabaseClient
-      .from('private_requests')
-      .select('status')
-      .eq('from_id', me)
-      .eq('to_id', privatePartner)
-      .maybeSingle();
-
-    if (data?.status === 'accepted') {
-      mode = 'private';
-      document.getElementById('privateStatus').innerText = `私聊中：${privatePartner}`;
-    }
-  }
-
-  let q = supabaseClient
-    .from('messages')
-    .select('*')
-    .gt('id', lastLoadedId)
-    .order('id', { ascending: true });
-
-  if (mode === 'group') {
-    q = q.eq('type', 'public');
-  } else {
-    q = q.eq('type', 'private').or(`(from_id.eq.${me},to_id.eq.${me})`);
-  }
-
-  const { data: list } = await q;
-  if (!list) return;
-
-  const dom = document.getElementById('messages');
-  list.forEach(m => {
-    if (loadedMessageIds.has(m.id)) return;
-    loadedMessageIds.add(m.id);
-    lastLoadedId = Math.max(lastLoadedId, m.id);
-
-    const num = m.from_id.replace('号', '');
-    const isMe = m.from_id === me;
-    dom.insertAdjacentHTML('beforeend', `
-      <div class="msg ${isMe ? 'me' : ''}">
-        <div class="avatar" data-id="${m.from_id}">${num}</div>
-        <div class="bubble">${m.content}</div>
-      </div>
-    `);
-  });
-
-  dom.scrollTop = dom.scrollHeight;
-}
-
-// 修复：发送（群聊+私聊都正常）
-async function send() {
-  const txt = document.getElementById('msgInput').value.trim();
-  if (!txt || !me) return;
-
-  const msgType = mode === 'group' ? 'public' : 'private';
-  const to = mode === 'group' ? 'all' : privatePartner;
-
-  await supabaseClient.from('messages').insert([{
-    from_id: me,
-    content: txt,
-    type: msgType,
-    to_id: to
-  }]);
-
-  document.getElementById('msgInput').value = '';
-}
-</script>
-</body>
-</html>
+    document.getElementById('privateModal').

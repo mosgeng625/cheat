@@ -315,6 +315,9 @@ let loadMsgTimer = null;
 let checkReqTimer = null;
 let privateAcceptTimer = null;
 
+// 全局加个锁：防止重复执行
+let isProcessingReply = false;
+
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   document.getElementById('loginBtn').addEventListener('click', login);
@@ -434,26 +437,45 @@ async function checkPrivateRequest() {
   document.getElementById('privateModal').style.display = 'flex';
 }
 
+// 被申请方：同意/拒绝私聊请求（带防重复锁）
 async function acceptPrivate() {
-  if (!window.curReq) return;
-  const from = window.curReq.from_id;
-  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
+  if (isProcessingReply) return;
+  isProcessingReply = true;
+  try {
+    if (!window.curReq) return;
+    const from = window.curReq.from_id;
+    await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
+    startPrivateChat(from);
+    document.getElementById('privateModal').style.display = 'none';
+  } finally {
+    isProcessingReply = false;
+  }
+}
+
+async function rejectPrivate() {
+  if (isProcessingReply) return;
+  isProcessingReply = true;
+  try {
+    if (!window.curReq) return;
+    await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.curReq.id);
+    document.getElementById('privateModal').style.display = 'none';
+  } finally {
+    isProcessingReply = false;
+  }
+}
+
+// 进入私聊时：清空已读消息缓存，防止重复加载
+function startPrivateChat(targetId) {
+  privatePartner = targetId;
   mode = 'private';
-  privatePartner = from;
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateModal').style.display = 'none';
-  document.getElementById('privateStatus').innerText = `（私聊中：${from}）`;
   lastLoadedId = 0;
   loadedMessageIds.clear();
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('endPrivateBtn').style.display = 'inline-block';
+  document.getElementById('privateStatus').innerText = `（私聊中：${targetId}）`;
 }
 
-function rejectPrivate() {
-  if (window.curReq) {
-    supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.curReq.id);
-  }
-  document.getElementById('privateModal').style.display = 'none';
-}
-
+// 退出私聊（清空缓存，不重复加载历史消息）
 async function endPrivate() {
   clearInterval(privateAcceptTimer);
   if (window.privateTimeoutTimer) clearInterval(window.privateTimeoutTimer);

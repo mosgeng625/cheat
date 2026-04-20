@@ -292,7 +292,7 @@
     </div>
   </div>
   <div id="privatePanel">
-    <div id="privateList">暂无私 you</div>
+    <div id="privateList">暂无私聊</div>
   </div>
   <div id="messages"></div>
   <div id="inputArea">
@@ -336,7 +336,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
 
 let supabaseClient;
@@ -353,7 +353,6 @@ let privateRejectTimer = null;
 let enterPrivateAtMsgId = null;
 let isProcessingReply = false;
 
-// 发起方倒计时定时器
 let timeoutTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -418,6 +417,7 @@ async function sendPrivateRequest(to) {
   await supabaseClient.from('private_requests')
     .delete()
     .or(`from_id.eq('${me}'),to_id.eq('${me}')`);
+
   await supabaseClient.from('private_requests').insert([{
     from_id: me,
     to_id: to,
@@ -464,7 +464,7 @@ async function sendPrivateRequest(to) {
     }
   }, 600);
 
-  // 监听同意 ———— 这里是你原来缺失的！
+  // 监听同意 —— 修复完成
   privateAcceptTimer = setInterval(async () => {
     const { data: req } = await supabaseClient
       .from('private_requests')
@@ -473,11 +473,14 @@ async function sendPrivateRequest(to) {
       .eq('to_id', to)
       .eq('status', 'accepted')
       .maybeSingle();
+
     if (req) {
-      // 对方同意，清空所有定时器，进入正常私聊
       clearInterval(timeoutTimer);
       clearInterval(privateRejectTimer);
       clearInterval(privateAcceptTimer);
+
+      privatePartner = to;
+      mode = 'private';
       document.getElementById('privateStatus').innerText = `（私聊中：${to}）`;
     }
   }, 600);
@@ -485,13 +488,15 @@ async function sendPrivateRequest(to) {
 
 async function checkPrivateRequest() {
   if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;
+
   const { data: reqs } = await supabaseClient
     .from('private_requests')
     .select('*')
     .eq('to_id', me)
     .eq('status', 'pending')
-    .order('created_at', ascending: false)
+    .order('created_at', { ascending: false })
     .limit(1);
+
   if (!reqs || reqs.length === 0) return;
   window.curReq = reqs[0];
   document.getElementById('modalText').innerText = window.curReq.from_id + ' 想和你私聊';

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>稳定聊天</title>
+<title>终极不重复聊天</title>
 <style>
   * {
     margin: 0;
@@ -178,8 +178,8 @@ const supabase = supabase.createClient(
 let me = null;
 let privateWith = null;
 let lastId = 0;
+let loadedIds = new Set(); // 【终极防重复：记录所有已加载消息ID】
 
-// 登录
 async function login() {
   let v = document.getElementById('playerId').value.trim() || '1';
   v = v.replace(/\D/g,'');
@@ -190,15 +190,15 @@ async function login() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我：' + me;
 
-  // 只加载新消息，永不重复
-  setInterval(loadNewMsg, 300);
-  // 监听私聊邀请
-  setInterval(watchInvite, 500);
-  // 监听对方是否退出私聊
-  setInterval(watchPartnerQuit, 500);
+  setTimeout(() => {
+    setInterval(loadNewMsg, 300);
+    setInterval(watchInvite, 500);
+    setInterval(watchPartnerAccept, 500);
+    setInterval(watchPartnerQuit, 500);
+  }, 200);
 }
 
-// 只加载新消息（核心修复）
+// 【终极防重复】只加载新消息，ID 去重
 async function loadNewMsg() {
   const { data } = await supabase
     .from('messages')
@@ -209,37 +209,37 @@ async function loadNewMsg() {
   if (!data || data.length === 0) return;
 
   const box = document.getElementById('messages');
+  let updated = false;
+
   data.forEach(m => {
-    const isPrivateChat = m.type === 'private';
-    const isToMe = m.to_id === me;
-    const isFromMe = m.from_id === me;
-    const isToPartner = m.to_id === privateWith;
+    if (loadedIds.has(m.id)) return; // 绝对不重复
+    loadedIds.add(m.id);
 
-    // 群聊只看 public
+    // 群聊 / 私聊 过滤
     if (!privateWith && m.type !== 'public') return;
-
-    // 私聊只看双方
     if (privateWith) {
-      const ok = (isFromMe && isToPartner) || (isToMe && m.from_id === privateWith);
-      if (!ok) return;
+      const isMatch =
+        (m.from_id === me && m.to_id === privateWith) ||
+        (m.from_id === privateWith && m.to_id === me);
+      if (!isMatch) return;
     }
 
     const isMe = m.from_id === me;
     const num = m.from_id.replace('号','');
-    const html = `
+    box.insertAdjacentHTML('beforeend', `
       <div class="msg ${isMe ? 'me' : ''}">
         <div class="avatar" data-id="${m.from_id}">${num}</div>
         <div class="bubble">${m.content}</div>
       </div>
-    `;
-    box.insertAdjacentHTML('beforeend', html);
+    `);
+
     lastId = Math.max(lastId, m.id);
+    updated = true;
   });
 
-  box.scrollTop = box.scrollHeight;
+  if (updated) box.scrollTop = box.scrollHeight;
 }
 
-// 发送消息
 async function send() {
   const i = document.getElementById('msgInput');
   const c = i.value.trim();
@@ -254,100 +254,77 @@ async function send() {
   }]);
 }
 
-// 点击头像发起私聊
 document.getElementById('messages').onclick = e => {
   const ava = e.target.closest('.avatar');
   if (!ava) return;
   const to = ava.dataset.id;
   if (to === me) return;
-  invite(to);
+  supabase.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
+  alert('已发起私聊');
 };
 
-// 发起邀请
-async function invite(to) {
-  await supabase.from('private_invite').insert([{ from_id: me, to_id: to, ok: false }]);
-  alert('已发起私聊邀请');
-}
-
-// 监听邀请
 async function watchInvite() {
   if (privateWith) return;
-
   const { data } = await supabase
-    .from('private_invite')
+    .from('private_requests')
     .select('*')
     .eq('to_id', me)
-    .eq('ok', false)
-    .order('id', { ascending: false })
+    .eq('status', 'pending')
     .limit(1);
-
   if (!data || data.length === 0) return;
-  const req = data[0];
-
-  const m = document.getElementById('inviteModal');
-  const t = document.getElementById('modalText');
-  t.innerText = req.from_id + ' 想和你私聊';
-  m.style.display = 'flex';
-  window.curInvite = req;
+  window.curReq = data[0];
+  document.getElementById('modalText').innerText = data[0].from_id + ' 想私聊';
+  document.getElementById('inviteModal').style.display = 'flex';
 }
 
-// 同意
 async function acceptPrivate() {
-  if (!window.curInvite) return;
-  const from = window.curInvite.from_id;
-
-  await supabase.from('private_invite').update({ ok: true }).eq('id', window.curInvite.id);
-
+  if (!window.curReq) return;
+  const from = window.curReq.from_id;
+  await supabase.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
   privateWith = from;
   document.getElementById('endBtn').style.display = 'inline-block';
   document.getElementById('inviteModal').style.display = 'none';
   lastId = 0;
+  loadedIds.clear();
 }
 
-// 拒绝
 function rejectPrivate() {
   document.getElementById('inviteModal').style.display = 'none';
 }
 
-// 监听对方是否同意（自动进私聊）
-setInterval(async () => {
+async function watchPartnerAccept() {
   if (privateWith) return;
-
   const { data } = await supabase
-    .from('private_invite')
+    .from('private_requests')
     .select('*')
     .eq('from_id', me)
-    .eq('ok', true)
-    .order('id', { ascending: false })
+    .eq('status', 'accepted')
     .limit(1);
-
   if (data && data.length > 0) {
     privateWith = data[0].to_id;
     document.getElementById('endBtn').style.display = 'inline-block';
     lastId = 0;
+    loadedIds.clear();
   }
-}, 500);
+}
 
-// 结束私聊
 async function endPrivate() {
   if (!privateWith) return;
-  await supabase.from('private_invite').delete().or(
+  await supabase.from('private_requests').delete().or(
     `from_id.eq.${me},to_id.eq.${me},from_id.eq.${privateWith},to_id.eq.${privateWith}`
   );
   privateWith = null;
   document.getElementById('endBtn').style.display = 'none';
   lastId = 0;
+  loadedIds.clear();
 }
 
-// 监听对方退出
 async function watchPartnerQuit() {
   if (!privateWith) return;
-
   const { data } = await supabase
-    .from('private_invite')
+    .from('private_requests')
     .select('*')
     .or(`from_id.eq.${privateWith},to_id.eq.${privateWith}`);
-
   if (!data || data.length === 0) {
     privateWith = null;
     document.getElementById('endBtn').style.display = 'none';

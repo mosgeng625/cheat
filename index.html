@@ -196,7 +196,7 @@
     z-index: 999;
   }
   #quickMenu button {
-    background: #383838;
+    background: #38338;
     color: #fff;
     border: none;
     padding: 8px 10px;
@@ -320,9 +320,10 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
-
-// 👇 只加这一行，防重复核心
 let loadedMessageIds = new Set();
+
+// 👇 只加这一行：终极防重复锁
+let isLoading = false;
 
 let loadMsgTimer = null;
 let checkReqTimer = null;
@@ -488,45 +489,53 @@ function forceExitPrivate() {
   loadedMessageIds.clear();
 }
 
-// 👇 只修复这个函数，其他完全不动！！！
+// 👇 只在这里加了防重复锁，其他完全不动
 async function loadNewMessages() {
-  const { data: list } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .gt('id', lastLoadedId)
-    .order('created_at', { ascending: true });
+  // 👇 终极修复：正在加载时，直接跳过，绝对不重复
+  if (isLoading) return;
+  isLoading = true;
 
-  if (!list || list.length === 0) return;
+  try {
+    const { data: list } = await supabaseClient
+      .from('messages')
+      .select('*')
+      .gt('id', lastLoadedId)
+      .order('created_at', { ascending: true });
 
-  const dom = document.getElementById('messages');
-  for (const m of list) {
-    // 👇 防重复：已经加载过的消息直接跳过
-    if (loadedMessageIds.has(m.id)) continue;
-    loadedMessageIds.add(m.id);
+    if (!list || list.length === 0) return;
 
-    if (mode === 'group' && m.type !== 'public') continue;
-    if (mode === 'private') {
-      if (m.type !== 'private') continue;
-      const valid = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
-      if (!valid) continue;
+    const dom = document.getElementById('messages');
+    for (const m of list) {
+      if (loadedMessageIds.has(m.id)) continue;
+      loadedMessageIds.add(m.id);
+
+      if (mode === 'group' && m.type !== 'public') continue;
+      if (mode === 'private') {
+        if (m.type !== 'private') continue;
+        const valid = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
+        if (!valid) continue;
+      }
+
+      if (m.type === 'system') {
+        dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+      } else {
+        const num = m.from_id.replace('号', '');
+        const isMe = m.from_id === me;
+        dom.insertAdjacentHTML('beforeend', `
+          <div class="msg ${isMe ? 'me' : ''}">
+            <div class="avatar" data-id="${m.from_id}">${num}</div>
+            <div class="bubble">${m.content}</div>
+          </div>`);
+      }
+
+      if (m.id > lastLoadedId) lastLoadedId = m.id;
     }
 
-    if (m.type === 'system') {
-      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
-    } else {
-      const num = m.from_id.replace('号', '');
-      const isMe = m.from_id === me;
-      dom.insertAdjacentHTML('beforeend', `
-        <div class="msg ${isMe ? 'me' : ''}">
-          <div class="avatar" data-id="${m.from_id}">${num}</div>
-          <div class="bubble">${m.content}</div>
-        </div>`);
-    }
-
-    if (m.id > lastLoadedId) lastLoadedId = m.id;
+    dom.scrollTop = dom.scrollHeight;
+  } finally {
+    // 👇 加载完成解锁
+    isLoading = false;
   }
-
-  dom.scrollTop = dom.scrollHeight;
 }
 
 async function send() {

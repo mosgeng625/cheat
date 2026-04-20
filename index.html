@@ -170,7 +170,6 @@
     flex-direction: row-reverse;
   }
 
-  /* 统一头像样式：文字头像 */
   .avatar {
     width: 36px;
     height: 36px;
@@ -184,6 +183,16 @@
     font-size: 16px;
     cursor: pointer;
     flex-shrink: 0;
+  }
+
+  .sender-name {
+    font-size: 11px;
+    color: #aaa;
+    margin-bottom: 3px;
+  }
+  .msg.me .sender-name {
+    text-align: right;
+    color: #e0e0e0;
   }
 
   .bubble {
@@ -461,7 +470,7 @@ async function login() {
   refreshPrivatePanel();
 }
 
-// 无间道登录
+// 无间道登录 + 隐藏展开私聊按钮
 async function nicknameLogin() {
   let nickname = document.getElementById('nicknameInput').value.trim();
   if (!nickname) { alert('请输入名字'); return; }
@@ -473,12 +482,15 @@ async function nicknameLogin() {
   document.getElementById('nicknameLogin').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
+  
+  // 无间道模式：删除顶部展开私聊状态按钮
+  document.getElementById('togglePrivateBtn').style.display = 'none';
 
   setInterval(checkPrivateRequest, 600);
   refreshPrivatePanel();
 }
 
-// 无间道模式不发送系统提示
+// 无间道不发系统提示
 async function sendSystemMessage(content) {
   if (currentMode === 'spy') return;
   await supabaseClient.from('messages').insert([{
@@ -503,7 +515,6 @@ function togglePrivatePanel() {
   }
 }
 
-// 私聊面板：房间轮显示详情，无间道隐藏
 async function loadActivePrivateList() {
   if (!me) return;
   try {
@@ -641,7 +652,7 @@ async function endPrivate() {
   refreshPrivatePanel();
 }
 
-// ====================== 核心：无间道头像 = 名字第一个字 ======================
+// ====================== 核心：无间道 = 头像 + 名字同时显示 ======================
 async function loadNewMessages() {
   if (isLoading) return;
   isLoading = true;
@@ -672,11 +683,14 @@ async function loadNewMessages() {
         const tag = m.type === 'private' ? '<span class="private-tag">[私聊]</span>' : '';
         const firstChar = m.from_id.charAt(0) || '?';
 
-        // 无间道：头像 = 名字第一个字
+        // 头像 + 发送者名字 同时显示
         dom.insertAdjacentHTML('beforeend', `
           <div class="msg ${isMe ? 'me' : ''}">
             <div class="avatar" data-id="${m.from_id}">${firstChar}</div>
-            <div class="bubble">${m.content}${tag}</div>
+            <div style="flex:1">
+              <div class="sender-name">${m.from_id}</div>
+              <div class="bubble">${m.content}${tag}</div>
+            </div>
           </div>
         `);
       }

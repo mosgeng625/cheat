@@ -12,7 +12,7 @@
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   body {
-    background: #111318;
+    background: #111338;
     color: #eee;
     max-width: 500px;
     margin: 0 auto;
@@ -401,7 +401,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
 
 let supabaseClient;
@@ -414,6 +414,7 @@ let privatePartner = null;
 let lastLoadedId = 0;
 let loadedMessageIds = new Set();
 let isLoading = false;
+let heartbeatTimer = null;
 
 let privateCheckTimer = null;
 let privateWaitTimer = null;
@@ -466,13 +467,47 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   setInterval(loadNewMessages, 400);
+  window.addEventListener('beforeunload', ()=>{
+    if(myRealId) logout();
+  });
 });
 
+// ✅ 在线状态：心跳
+async function heartbeat(){
+  if(!myRealId) return;
+  await supabaseClient.from('online_users').upsert({
+    id: myRealId,
+    last_active: new Date().toISOString()
+  });
+}
+
+// ✅ 退出登录
+async function logout(){
+  if(!myRealId) return;
+  await supabaseClient.from('online_users').delete().eq('id', myRealId);
+  clearInterval(heartbeatTimer);
+}
+
+// ✅ 检查号码是否在线
+async function isNumberOnline(uid){
+  const { data } = await supabaseClient
+    .from('online_users')
+    .select('*')
+    .eq('id', uid)
+    .maybeSingle();
+  if(!data) return false;
+  const now = new Date();
+  const last = new Date(data.last_active);
+  const diff = (now - last) / 1000;
+  return diff < 8;
+}
+
 function backToModeSelect() {
+  logout();
   me = null; myRealId = null;
   mode = "group"; privatePartner = null;
   lastLoadedId = 0; loadedMessageIds.clear();
-  clearInterval(privateCheckTimer); clearInterval(privateWaitTimer); clearInterval(watchExitTimer);
+  clearAllTimers();
   document.getElementById('app').style.display = 'none';
   document.getElementById('login').style.display = 'none';
   document.getElementById('nicknameLogin').style.display = 'none';
@@ -482,11 +517,21 @@ function backToModeSelect() {
   document.getElementById('endPrivateBtn').style.display = 'none';
 }
 
+// ✅ 房间轮登录：带在线验证
 async function login() {
   let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
   v = Math.max(1, Math.min(8, v));
   me = v + '号';
   myRealId = prefix + me;
+
+  // 验证在线
+  const online = await isNumberOnline(myRealId);
+  if(online){
+    alert(me + ' 已在线，无法重复登录！');
+    myRealId = null;
+    me = null;
+    return;
+  }
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -494,6 +539,8 @@ async function login() {
   document.getElementById('togglePrivateBtn').style.display = 'inline-block';
   document.getElementById('quickAddBtn').style.display = 'block';
   setInterval(checkPrivateRequest, 600);
+  heartbeatTimer = setInterval(heartbeat, 3000);
+  heartbeat();
   refreshPrivatePanel();
 }
 
@@ -691,6 +738,7 @@ async function endPrivate() {
 
 function clearAllTimers(){
   clearInterval(privateWaitTimer); clearInterval(privateCheckTimer); clearInterval(watchExitTimer);
+  clearInterval(heartbeatTimer);
 }
 
 async function loadActivePrivateList() {
@@ -743,16 +791,17 @@ function togglePrivatePanel() {
 function showResetModal() { document.getElementById('resetModal').style.display = 'flex'; }
 function closeResetModal() { document.getElementById('resetModal').style.display = 'none'; }
 
-// ✅ 核心修复：彻底清空当前模式，绝不影响另一个模式
 async function confirmReset() {
   if (document.getElementById('resetPwd').value !== ADMIN_PWD) return alert('密码错误');
 
-  // 只删除 当前模式（room_ 或 spy_）的所有数据，绝对隔离
   await supabaseClient.from('messages').delete()
     .or(`from_id.like.${prefix}%,to_id.like.${prefix}%`);
     
   await supabaseClient.from('private_requests').delete()
     .or(`from_id.like.${prefix}%,to_id.like.${prefix}%`);
+
+  await supabaseClient.from('online_users').delete()
+    .like('id', prefix+'%');
 
   alert('重置成功！当前房间已清空');
   location.reload();

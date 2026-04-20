@@ -319,7 +319,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+const SUPABASE_KEY = "eyJhbGciOiJIUzINiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 
 let supabaseClient;
 let me = null;
@@ -340,27 +340,27 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('acceptBtn').onclick = acceptPrivate;
   document.getElementById('rejectBtn').onclick = rejectPrivate;
 
-  // + 号菜单（稳定版）
+  // + 号菜单：点一下 → 填入输入框（原始行为）
   const quickAddBtn = document.getElementById('quickAddBtn');
   const quickMenu = document.getElementById('quickMenu');
+  const msgInput = document.getElementById('msgInput');
+
   quickAddBtn.onclick = (e) => {
     e.stopPropagation();
     quickMenu.style.display = quickMenu.style.display === 'flex' ? 'none' : 'flex';
   };
   document.body.onclick = () => { quickMenu.style.display = 'none'; };
 
+  // 修复：点菜单只填文字，不自动申请私聊
   document.querySelectorAll('#quickMenu button').forEach(btn => {
     btn.onclick = () => {
-      const txt = btn.dataset.t;
-      const target = txt.match(/(\d+号)/)?.[1];
-      if (target && target !== me) {
-        sendPrivateRequest(target);
-        quickMenu.style.display = 'none';
-      }
+      msgInput.value = btn.dataset.t;
+      quickMenu.style.display = 'none';
+      msgInput.focus();
     };
   });
 
-  // 点击头像发起私聊
+  // 点头像 → 才发起私聊申请（原始行为）
   document.getElementById('messages').onclick = e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -382,7 +382,7 @@ async function login() {
   document.getElementById('myInfo').innerText = '我是：' + me;
 }
 
-// 发起私聊申请
+// 发起私聊（仅点头像触发）
 async function sendPrivateRequest(to) {
   await supabaseClient.from('private_requests').delete().or(`from_id.eq.${me},to_id.eq.${me}`);
   await supabaseClient.from('private_requests').insert([{
@@ -398,7 +398,6 @@ async function sendPrivateRequest(to) {
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
 }
 
-// 检查私聊请求
 async function checkPrivateRequest() {
   if (mode !== 'group') return;
   const { data } = await supabaseClient
@@ -411,4 +410,109 @@ async function checkPrivateRequest() {
   if (data?.length) {
     window.curReq = data[0];
     document.getElementById('modalText').innerText = `${curReq.from_id} 想和你私聊`;
-    document.getElementById('privateModal').
+    document.getElementById('privateModal').style.display = 'flex';
+  }
+}
+
+async function acceptPrivate() {
+  if (!window.curReq) return;
+  const from = window.curReq.from_id;
+
+  await supabaseClient.from('private_requests')
+    .update({ status: 'accepted' })
+    .eq('id', window.curReq.id);
+
+  document.getElementById('privateModal').style.display = 'none';
+
+  mode = 'private';
+  privatePartner = from;
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('privateStatus').innerText = `私聊中：${from}`;
+}
+
+function rejectPrivate() {
+  document.getElementById('privateModal').style.display = 'none';
+}
+
+function endPrivate() {
+  mode = 'group';
+  privatePartner = null;
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+  document.getElementById('privateStatus').innerText = '';
+  document.getElementById('endPrivateBtn').style.display = 'none';
+}
+
+async function loadNewMessages() {
+  if (!me) return;
+
+  if (mode === 'pending_private' && privatePartner) {
+    const { data } = await supabaseClient
+      .from('private_requests')
+      .select('status')
+      .eq('from_id', me)
+      .eq('to_id', privatePartner)
+      .maybeSingle();
+
+    if (data?.status === 'accepted') {
+      mode = 'private';
+      document.getElementById('privateStatus').innerText = `私聊中：${privatePartner}`;
+    }
+  }
+
+  let q = supabaseClient
+    .from('messages')
+    .select('*')
+    .gt('id', lastLoadedId)
+    .order('id', { ascending: true });
+
+  if (mode === 'group') {
+    q = q.eq('type', 'public');
+  } else {
+    q = q.eq('type', 'private').or(`from_id.eq.${me},to_id.eq.${me}`);
+  }
+
+  const { data: list } = await q;
+  if (!list) return;
+
+  const dom = document.getElementById('messages');
+  list.forEach(m => {
+    if (loadedMessageIds.has(m.id)) return;
+    loadedMessageIds.add(m.id);
+    lastLoadedId = Math.max(lastLoadedId, m.id);
+
+    const num = m.from_id.replace('号', '');
+    const isMe = m.from_id === me;
+    dom.insertAdjacentHTML('beforeend', `
+      <div class="msg ${isMe ? 'me' : ''}">
+        <div class="avatar" data-id="${m.from_id}">${num}</div>
+        <div class="bubble">${m.content}</div>
+      </div>
+    `);
+  });
+
+  dom.scrollTop = dom.scrollHeight;
+}
+
+// 发送：完全修复，公聊/私聊都正常
+async function send() {
+  const txt = document.getElementById('msgInput').value.trim();
+  if (!txt || !me) return;
+
+  const msgType = mode === 'group' ? 'public' : 'private';
+  const to = mode === 'group' ? 'all' : privatePartner;
+
+  await supabaseClient.from('messages').insert([{
+    from_id: me,
+    content: txt,
+    type: msgType,
+    to_id: to
+  }]);
+
+  document.getElementById('msgInput').value = '';
+}
+</script>
+</body>
+</html>

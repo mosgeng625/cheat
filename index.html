@@ -170,15 +170,18 @@
     flex-direction: row-reverse;
   }
 
+  /* 统一头像样式：文字头像 */
   .avatar {
-    width: 34px;
-    height: 34px;
-    background: #555;
-    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
+    font-size: 16px;
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -192,17 +195,6 @@
   .msg.me .bubble {
     background: #07c160;
     color: #fff;
-  }
-
-  .sender-name {
-    font-size: 11px;
-    color: #aaa;
-    margin-bottom: 4px;
-    padding: 0 2px;
-  }
-  .msg.me .sender-name {
-    text-align: right;
-    color: #e0e0e0;
   }
 
   .private-tag {
@@ -486,9 +478,9 @@ async function nicknameLogin() {
   refreshPrivatePanel();
 }
 
-// 公屏系统消息（房间轮才发送）
+// 无间道模式不发送系统提示
 async function sendSystemMessage(content) {
-  if (currentMode === 'spy') return; // 无间道不发公屏提示
+  if (currentMode === 'spy') return;
   await supabaseClient.from('messages').insert([{
     from_id: '系统', content: content, type: 'public', to_id: 'all'
   }]);
@@ -511,7 +503,7 @@ function togglePrivatePanel() {
   }
 }
 
-// 私聊面板：房间轮显示详情，无间道只显示自己的
+// 私聊面板：房间轮显示详情，无间道隐藏
 async function loadActivePrivateList() {
   if (!me) return;
   try {
@@ -649,7 +641,7 @@ async function endPrivate() {
   refreshPrivatePanel();
 }
 
-// 消息渲染：房间轮头像，无间道昵称
+// ====================== 核心：无间道头像 = 名字第一个字 ======================
 async function loadNewMessages() {
   if (isLoading) return;
   isLoading = true;
@@ -678,25 +670,15 @@ async function loadNewMessages() {
       } else {
         const isMe = m.from_id === me;
         const tag = m.type === 'private' ? '<span class="private-tag">[私聊]</span>' : '';
+        const firstChar = m.from_id.charAt(0) || '?';
 
-        if (currentMode === 'room') {
-          const num = m.from_id.replace('号', '');
-          dom.insertAdjacentHTML('beforeend', `
-            <div class="msg ${isMe ? 'me' : ''}">
-              <div class="avatar" data-id="${m.from_id}">${num}</div>
-              <div class="bubble">${m.content}${tag}</div>
-            </div>
-          `);
-        } else {
-          dom.insertAdjacentHTML('beforeend', `
-            <div class="msg ${isMe ? 'me' : ''}">
-              <div style="width:100%">
-                <div class="sender-name">${m.from_id}</div>
-                <div class="bubble">${m.content}${tag}</div>
-              </div>
-            </div>
-          `);
-        }
+        // 无间道：头像 = 名字第一个字
+        dom.insertAdjacentHTML('beforeend', `
+          <div class="msg ${isMe ? 'me' : ''}">
+            <div class="avatar" data-id="${m.from_id}">${firstChar}</div>
+            <div class="bubble">${m.content}${tag}</div>
+          </div>
+        `);
       }
       if (m.id > lastLoadedId) lastLoadedId = m.id;
     }

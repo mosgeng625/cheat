@@ -266,8 +266,10 @@ let supabaseClient;
 let me = null;
 let mode = "group";
 let privatePartner = null;
+
+// 全局只维护一套已加载消息 ID，切换模式不清空
 let lastLoadedId = 0;
-let loadedMessageIds = new Set(); // 防重复
+let loadedIds = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -383,8 +385,6 @@ async function watchMySentRequest() {
     mode = 'private';
     privatePartner = req.to_id;
     document.getElementById('endPrivateBtn').style.display = 'inline-block';
-    lastLoadedId = 0;
-    loadedMessageIds.clear();
   }
 }
 
@@ -400,8 +400,6 @@ async function acceptPrivate() {
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
-  lastLoadedId = 0;
-  loadedMessageIds.clear();
 }
 
 async function rejectPrivate() {
@@ -410,53 +408,52 @@ async function rejectPrivate() {
   document.getElementById('privateModal').style.display = 'none';
 }
 
+// ====================== 核心修复：退出私聊不清空消息记录 ======================
 async function endPrivate() {
   if (!privatePartner) return;
 
-  // 清理状态
+  // 只改自己状态，不改对方，实现各自手动退出
   await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
-  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', privatePartner);
 
-  // 关闭所有相关请求，防止反复进入
+  // 关闭自己的请求，防止重复进入
   await supabaseClient.from('private_requests')
     .update({ status: 'closed' })
-    .or(`from_id.eq.${me},to_id.eq.${me},from_id.eq.${privatePartner},to_id.eq.${privatePartner}`);
+    .eq('from_id', me)
+    .eq('to_id', privatePartner);
 
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
-  lastLoadedId = 0;
-  loadedMessageIds.clear();
+
+  // 不清空 loadedIds，所以公屏消息不会重复加载
 }
 
-// ==============================================
-// 【真正修复：只追加新消息，绝不重复、绝不闪烁】
-// ==============================================
+// ====================== 消息永不重复 ======================
 async function loadMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
     .select('*')
-    .gt('id', lastLoadedId)
     .order('id', { ascending: true });
 
-  if (!list || list.length === 0) return;
+  if (!list) return;
+
   const dom = document.getElementById('messages');
   let updated = false;
 
-  for (const m of list) {
-    if (loadedMessageIds.has(m.id)) continue;
-    loadedMessageIds.add(m.id);
+  list.forEach(m => {
+    if (loadedIds.has(m.id)) return;
 
-    // 模式过滤
-    if (mode === 'group' && m.type !== 'public') continue;
+    // 群聊 / 私聊 过滤
+    if (mode === 'group' && m.type !== 'public') return;
     if (mode === 'private') {
-      const isBetween =
+      const isPrivateChat =
         (m.from_id === me && m.to_id === privatePartner) ||
         (m.from_id === privatePartner && m.to_id === me);
-      if (!isBetween) continue;
+      if (!isPrivateChat || m.type !== 'private') return;
     }
 
-    let html = '';
+    // 插入消息
+    let html;
     if (m.type === 'system') {
       html = `<div class="sys">${m.content}</div>`;
     } else {
@@ -470,11 +467,14 @@ async function loadMessages() {
     }
 
     dom.insertAdjacentHTML('beforeend', html);
+    loadedIds.add(m.id);
     lastLoadedId = Math.max(lastLoadedId, m.id);
     updated = true;
-  }
+  });
 
-  if (updated) dom.scrollTop = dom.scrollHeight;
+  if (updated) {
+    dom.scrollTop = dom.scrollHeight;
+  }
 }
 
 async function send() {
@@ -487,7 +487,7 @@ async function send() {
     content: c,
     type: mode === 'group' ? 'public' : 'private',
     to_id: mode === 'group' ? 'all' : privatePartner
-  }]);
+  }];
   i.value = '';
 }
 

@@ -350,9 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
   quickMenu.addEventListener('click', e => {
     e.stopPropagation();
     const btn = e.target.closest('[data-t]');
-    if (!btn) return;
-    document.getElementById('msgInput').value = btn.dataset.t;
-    quickMenu.style.display = 'none';
+    if (btn) {
+      document.getElementById('msgInput').value = btn.dataset.t;
+      quickMenu.style.display = 'none';
+    }
   });
   document.addEventListener('click', () => {
     quickMenu.style.display = 'none';
@@ -384,7 +385,77 @@ async function login() {
 
   loadMsgTimer = setInterval(loadNewMessages, 300);
   checkReqTimer = setInterval(checkPrivateRequest, 500);
+});
+
+// 👇 只修复以下3个函数，其他完全不动！
+async function sendPrivateRequest(to) {
+  const { data: target } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', to).single();
+  if (target?.is_private_chat_with) return alert(to + ' 正在私聊中');
+  
+  await supabaseClient.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
+  alert('已向 ' + to + ' 发起私聊申请');
+
+  // 修复：发起者持续监听是否被同意
+  let waitAccept = setInterval(async () => {
+    const { data: req } = await supabaseClient
+      .from('private_requests')
+      .select('*')
+      .eq('from_id', me)
+      .eq('to_id', to)
+      .eq('status', 'accepted')
+      .single();
+
+    if (req) {
+      clearInterval(waitAccept);
+      mode = 'private';
+      privatePartner = to;
+      document.getElementById('endPrivateBtn').style.display = 'inline-block';
+      updateMyUiStatus();
+      lastLoadedId = 0;
+      loadedMessageIds.clear();
+      watchPartnerExitTimer = setInterval(watchPartnerExit, 500);
+    }
+  }, 600);
 }
+
+async function acceptPrivate() {
+  if (!window.curReq) return;
+  const from = window.curReq.from_id;
+
+  // 修复：先更新请求状态，再更新玩家数据
+  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
+  await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
+  await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
+
+  // 修复：延迟开启监听，防止立刻误判退出
+  setTimeout(() => {
+    mode = 'private';
+    privatePartner = from;
+    document.getElementById('endPrivateBtn').style.display = 'inline-block';
+    document.getElementById('privateModal').style.display = 'none';
+    updateMyUiStatus();
+    lastLoadedId = 0;
+    loadedMessageIds.clear();
+    clearInterval(watchPartnerExitTimer);
+    watchPartnerExitTimer = setInterval(watchPartnerExit, 600);
+  }, 600);
+}
+
+async function watchPartnerExit() {
+  if (mode !== 'private' || !privatePartner) return;
+  
+  const { data: partner } = await supabaseClient
+    .from('players')
+    .select('is_private_chat_with')
+    .eq('player_id', privatePartner)
+    .single();
+
+  // 修复：只有对方确实置空，才退出
+  if (partner && partner.is_private_chat_with === null) {
+    forceExitPrivate();
+  }
+}
+// 👆 只修复以上3个函数，其他完全不动！
 
 function togglePrivatePanel() {
   const panel = document.getElementById('privatePanel');
@@ -406,13 +477,6 @@ async function refreshPrivateStatusPanel() {
   listEl.innerText = pairs.join('\n');
 }
 
-async function sendPrivateRequest(to) {
-  const { data: target } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', to).single();
-  if (target?.is_private_chat_with) return alert(to + ' 正在私聊中');
-  await supabaseClient.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
-  alert('已向 ' + to + ' 发起私聊申请');
-}
-
 async function checkPrivateRequest() {
   if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;
   const { data: reqs } = await supabaseClient
@@ -429,43 +493,9 @@ async function checkPrivateRequest() {
   window.curReq = req;
 }
 
-// 👇 修复：同意私聊逻辑，防止立刻退出
-async function acceptPrivate() {
-  if (!window.curReq) return;
-  const from = window.curReq.from_id;
-
-  // 先更新数据库，再设置本地状态，避免状态不一致导致退出
-  await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
-  await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
-  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
-
-  // 先设置本地状态，再开启监听，避免监听误判
-  mode = 'private';
-  privatePartner = from;
-  document.getElementById('endPrivateBtn').style.display = 'inline-block';
-  document.getElementById('privateModal').style.display = 'none';
-  updateMyUiStatus();
-
-  // 清空消息记录，避免切换时重复加载
-  lastLoadedId = 0;
-  loadedMessageIds.clear();
-
-  // 开启对方退出监听
-  clearInterval(watchPartnerExitTimer);
-  watchPartnerExitTimer = setInterval(watchPartnerExit, 500);
-}
-
 async function rejectPrivate() {
   if (window.curReq) await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.curReq.id);
   document.getElementById('privateModal').style.display = 'none';
-}
-
-async function watchPartnerExit() {
-  if (mode !== 'private' || !privatePartner) return;
-  const { data: partner } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', privatePartner).single();
-  if (!partner || partner.is_private_chat_with !== me) {
-    forceExitPrivate();
-  }
 }
 
 async function endPrivate() {

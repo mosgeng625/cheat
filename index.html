@@ -333,8 +333,10 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<!-- 改用 CDN 稳定版，关闭存储相关特性 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.1/dist/umd/supabase.min.js"></script>
 <script>
+// 这里替换成你自己的 Supabase 项目信息
 const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
 const ADMIN_PWD = "admin123";
@@ -354,7 +356,15 @@ let enterPrivateAtMsgId = null;
 let isProcessingReply = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // 关闭所有本地存储相关的特性，避免被浏览器拦截
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  });
+
   document.getElementById('loginBtn').addEventListener('click', login);
   document.getElementById('togglePrivateBtn').addEventListener('click', togglePrivatePanel);
   document.getElementById('resetBtn').addEventListener('click', showResetModal);
@@ -393,9 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (target === me) return;
     sendPrivateRequest(target);
   });
-
-  // 全局实时监听私聊消息（修复：私聊也能收到）
-  startPrivateMessageListener();
 });
 
 async function login() {
@@ -450,7 +457,7 @@ async function sendPrivateRequest(to) {
     }
   }, 600);
 
-  // 监听同意（修复：同意后立即显示加入）
+  // 监听同意，显示加入提示
   privateAcceptTimer = setInterval(async () => {
     const { data: req } = await supabaseClient
       .from('private_requests')
@@ -463,15 +470,16 @@ async function sendPrivateRequest(to) {
     if (req) {
       clearInterval(privateRejectTimer);
       clearInterval(privateAcceptTimer);
+
       privatePartner = to;
       mode = 'private';
       document.getElementById('privateStatus').innerText = `（私聊中：${to}）`;
-      // 显示系统提示：X号已加入
-      addSystemMessage(`${to}已加入`);
-      // 加载历史私聊消息
-      loadPrivateMessages();
+
+      // 显示：X号已加入
+      const dom = document.getElementById('messages');
+      dom.insertAdjacentHTML('beforeend', `<div class="sys">${to}已加入</div>`);
     }
-  }, 400);
+  }, 600);
 }
 
 async function checkPrivateRequest() {
@@ -524,8 +532,6 @@ function startPrivateChat(targetId) {
   document.getElementById('messages').innerHTML = '';
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateStatus').innerText = `（私聊中：${targetId}）`;
-  // 加载历史私聊消息
-  loadPrivateMessages();
 }
 
 async function endPrivate() {
@@ -558,12 +564,21 @@ async function endPrivate() {
       dom.appendChild(tip);
       showedTip = true;
     }
-    renderMessage(m);
+    if (m.type === 'system') {
+      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+    } else {
+      const num = m.from_id.replace('号', '');
+      const isMe = m.from_id === me;
+      dom.insertAdjacentHTML('beforeend', `
+      <div class="msg ${isMe ? 'me' : ''}">
+        <div class="avatar" data-id="${m.from_id}">${num}</div>
+        <div class="bubble">${m.content}</div>
+      </div>`);
+    }
     if (m.id > lastLoadedId) lastLoadedId = m.id;
   });
 }
 
-// 修复：私聊消息加载（移除 mode === 'private' 限制）
 async function loadNewMessages() {
   if (isLoading) return;
   isLoading = true;
@@ -574,7 +589,6 @@ async function loadNewMessages() {
       .gt('id', lastLoadedId)
       .order('created_at', { ascending: true });
 
-    // 群聊/私聊 分别加载
     if (mode === 'group') {
       query.eq('type', 'public');
     } else {
@@ -584,89 +598,27 @@ async function loadNewMessages() {
 
     const { data: list } = await query;
     if (!list) return;
+    const dom = document.getElementById('messages');
     list.forEach(m => {
       if (loadedMessageIds.has(m.id)) return;
       loadedMessageIds.add(m.id);
-      renderMessage(m);
+      if (m.type === 'system') {
+        dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+      } else {
+        const num = m.from_id.replace('号', '');
+        const isMe = m.from_id === me;
+        dom.insertAdjacentHTML('beforeend', `
+        <div class="msg ${isMe ? 'me' : ''}">
+          <div class="avatar" data-id="${m.from_id}">${num}</div>
+          <div class="bubble">${m.content}</div>
+        </div>`);
+      }
       if (m.id > lastLoadedId) lastLoadedId = m.id;
     });
-    scrollToBottom();
+    dom.scrollTop = dom.scrollHeight;
   } finally {
     isLoading = false;
   }
-}
-
-// 新增：加载历史私聊消息
-async function loadPrivateMessages() {
-  if (!privatePartner) return;
-  const { data: list } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .eq('type', 'private')
-    .or(`and(from_id.eq.${me},to_id.eq.${privatePartner}),and(from_id.eq.${privatePartner},to_id.eq.${me})`)
-    .order('created_at', { ascending: true });
-
-  if (list) {
-    list.forEach(m => {
-      loadedMessageIds.add(m.id);
-      renderMessage(m);
-      if (m.id > lastLoadedId) lastLoadedId = m.id;
-    });
-    scrollToBottom();
-  }
-}
-
-// 新增：实时监听私聊新消息
-function startPrivateMessageListener() {
-  supabaseClient
-    .channel('private-chat')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages',
-      filter: `type=eq.private`
-    }, payload => {
-      const msg = payload.new;
-      // 只处理与自己相关的私聊
-      if ((msg.from_id === me && msg.to_id === privatePartner) ||
-          (msg.from_id === privatePartner && msg.to_id === me)) {
-        if (!loadedMessageIds.has(msg.id)) {
-          loadedMessageIds.add(msg.id);
-          renderMessage(msg);
-          scrollToBottom();
-        }
-      }
-    })
-    .subscribe();
-}
-
-// 新增：统一渲染消息
-function renderMessage(msg) {
-  const dom = document.getElementById('messages');
-  if (msg.type === 'system') {
-    dom.insertAdjacentHTML('beforeend', `<div class="sys">${msg.content}</div>`);
-  } else {
-    const num = msg.from_id.replace('号', '');
-    const isMe = msg.from_id === me;
-    dom.insertAdjacentHTML('beforeend', `
-    <div class="msg ${isMe ? 'me' : ''}">
-      <div class="avatar" data-id="${msg.from_id}">${num}</div>
-      <div class="bubble">${msg.content}</div>
-    </div>`);
-  }
-}
-
-// 新增：添加系统消息
-function addSystemMessage(text) {
-  const dom = document.getElementById('messages');
-  dom.insertAdjacentHTML('beforeend', `<div class="sys">${text}</div>`);
-  scrollToBottom();
-}
-
-// 新增：滚动到底部
-function scrollToBottom() {
-  const dom = document.getElementById('messages');
-  dom.scrollTop = dom.scrollHeight;
 }
 
 async function send() {

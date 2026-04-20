@@ -196,7 +196,7 @@
     z-index: 999;
   }
   #quickMenu button {
-    background: #38338;
+    background: #383838;
     color: #fff;
     border: none;
     padding: 8px 10px;
@@ -321,8 +321,6 @@ let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
 let loadedMessageIds = new Set();
-
-// 👇 只加这一行：终极防重复锁
 let isLoading = false;
 
 let loadMsgTimer = null;
@@ -352,10 +350,9 @@ document.addEventListener('DOMContentLoaded', () => {
   quickMenu.addEventListener('click', e => {
     e.stopPropagation();
     const btn = e.target.closest('[data-t]');
-    if (btn) {
-      document.getElementById('msgInput').value = btn.dataset.t;
-      quickMenu.style.display = 'none';
-    }
+    if (!btn) return;
+    document.getElementById('msgInput').value = btn.dataset.t;
+    quickMenu.style.display = 'none';
   });
   document.addEventListener('click', () => {
     quickMenu.style.display = 'none';
@@ -371,16 +368,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function login() {
-  let v = document.getElementById('playerId').value.trim() || '1';
-  v = v.replace(/\D/g, '');
-  v = Math.min(8, Math.max(1, v));
+  let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
+  v = Math.max(1, Math.min(8, v));
   me = v + '号';
 
   await supabaseClient.from('players').upsert({
     player_id: me,
     status: 'online',
     is_private_chat_with: null
-  });
+  }, { onConflict: 'player_id' });
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -413,15 +409,12 @@ async function refreshPrivateStatusPanel() {
 async function sendPrivateRequest(to) {
   const { data: target } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', to).single();
   if (target?.is_private_chat_with) return alert(to + ' 正在私聊中');
-
   await supabaseClient.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
   alert('已向 ' + to + ' 发起私聊申请');
 }
 
 async function checkPrivateRequest() {
-  if (mode === 'private') return;
-  if (document.getElementById('privateModal').style.display === 'flex') return;
-
+  if (mode === 'private' || document.getElementById('privateModal').style.display === 'flex') return;
   const { data: reqs } = await supabaseClient
     .from('private_requests')
     .select('*')
@@ -429,34 +422,41 @@ async function checkPrivateRequest() {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(1);
-
   if (!reqs || reqs.length === 0) return;
   const req = reqs[0];
   document.getElementById('modalText').innerText = req.from_id + ' 想和你私聊';
   document.getElementById('privateModal').style.display = 'flex';
-  window.currentRequest = req;
+  window.curReq = req;
 }
 
+// 👇 修复：同意私聊逻辑，防止立刻退出
 async function acceptPrivate() {
-  if (!window.currentRequest) return;
-  const from = window.currentRequest.from_id;
+  if (!window.curReq) return;
+  const from = window.curReq.from_id;
 
+  // 先更新数据库，再设置本地状态，避免状态不一致导致退出
   await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
-  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.currentRequest.id);
+  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
 
+  // 先设置本地状态，再开启监听，避免监听误判
   mode = 'private';
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
   updateMyUiStatus();
 
-  watchPartnerExitTimer = setInterval(watchPartnerExit, 400);
+  // 清空消息记录，避免切换时重复加载
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+
+  // 开启对方退出监听
+  clearInterval(watchPartnerExitTimer);
+  watchPartnerExitTimer = setInterval(watchPartnerExit, 500);
 }
 
 async function rejectPrivate() {
-  if (!window.currentRequest) return;
-  await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.currentRequest.id);
+  if (window.curReq) await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.curReq.id);
   document.getElementById('privateModal').style.display = 'none';
 }
 
@@ -471,12 +471,9 @@ async function watchPartnerExit() {
 async function endPrivate() {
   if (!privatePartner) return;
   const exPartner = privatePartner;
-
-  if (watchPartnerExitTimer) clearInterval(watchPartnerExitTimer);
-
+  clearInterval(watchPartnerExitTimer);
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', exPartner);
-
   forceExitPrivate();
 }
 
@@ -489,9 +486,7 @@ function forceExitPrivate() {
   loadedMessageIds.clear();
 }
 
-// 👇 只在这里加了防重复锁，其他完全不动
 async function loadNewMessages() {
-  // 👇 终极修复：正在加载时，直接跳过，绝对不重复
   if (isLoading) return;
   isLoading = true;
 
@@ -533,7 +528,6 @@ async function loadNewMessages() {
 
     dom.scrollTop = dom.scrollHeight;
   } finally {
-    // 👇 加载完成解锁
     isLoading = false;
   }
 }

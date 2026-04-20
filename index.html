@@ -17,7 +17,7 @@
     max-width: 500px;
     margin: 0 auto;
   }
-  #modeSelect {
+  #login {
     height: 100vh;
     display: flex;
     align-items: center;
@@ -40,7 +40,7 @@
     color: #999;
     margin-bottom: 20px;
   }
-  #playerId, #nicknameInput {
+  #playerId {
     width: 100%;
     padding: 12px;
     border-radius: 10px;
@@ -50,7 +50,7 @@
     text-align: center;
     margin-bottom: 15px;
   }
-  #loginBtn, #nicknameLoginBtn {
+  #loginBtn {
     width: 100%;
     padding: 12px;
     background: #07c160;
@@ -60,7 +60,6 @@
     font-weight: bold;
     cursor: pointer;
   }
-
   #app {
     display: none;
     height: 100vh;
@@ -98,7 +97,7 @@
   }
   #privateList { line-height: 1.5; }
   .header-right { display: flex; gap: 6px; }
-  #backBtn, #endPrivateBtn, #resetBtn {
+  #endPrivateBtn, #resetBtn {
     background: #ef4444;
     color: #fff;
     border: none;
@@ -171,6 +170,7 @@
     background: #252a33;
     gap: 6px;
     align-items: center;
+    position: relative;
   }
   #quickAddBtn {
     width: 36px;
@@ -206,6 +206,7 @@
     cursor: pointer;
     font-size: 13px;
   }
+  #quickMenu button:hover { background: #6366f1; }
   #msgInput {
     flex: 1;
     padding: 10px 14px;
@@ -258,29 +259,12 @@
 </head>
 <body>
 
-<div id="modeSelect">
+<div id="login">
   <div class="login-card">
     <h1>🔞20岁的少年心事🔞</h1>
-    <button class="mode-btn" id="roomModeBtn">房间轮模式</button>
-    <button class="mode-btn" id="spyModeBtn">无间道模式</button>
-  </div>
-</div>
-
-<div id="login" style="display:none">
-  <div class="login-card">
-    <h1>房间轮模式</h1>
-    <p>输入 1‑8 进入房间</p>
+    <p>输入 1‑8 进入房间轮 / 输入 9 进入无间道</p>
     <input id="playerId" placeholder="输入编号" maxlength="1">
     <button id="loginBtn">进入房间</button>
-  </div>
-</div>
-
-<div id="nicknameLogin" style="display:none">
-  <div class="login-card">
-    <h1>无间道模式</h1>
-    <p>输入你的名字</p>
-    <input id="nicknameInput" placeholder="输入名字">
-    <button id="nicknameLoginBtn">进入房间</button>
   </div>
 </div>
 
@@ -292,7 +276,6 @@
     </div>
     <button id="togglePrivateBtn">展开私聊状态</button>
     <div class="header-right">
-      <button id="backBtn">返回</button>
       <button id="resetBtn">重置</button>
       <button id="endPrivateBtn">结束私聊</button>
     </div>
@@ -346,7 +329,6 @@ const ADMIN_PWD = "admin123";
 let supabaseClient;
 let me = null;
 let myRealId = null;
-let currentMode = null;
 let prefix = "";
 let mode = "group";
 let privatePartner = null;
@@ -360,24 +342,7 @@ let watchExitTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  document.getElementById('roomModeBtn').onclick = () => {
-    currentMode = 'room';
-    prefix = 'room_';
-    document.getElementById('modeSelect').style.display = 'none';
-    document.getElementById('login').style.display = 'flex';
-  };
-
-  document.getElementById('spyModeBtn').onclick = () => {
-    currentMode = 'spy';
-    prefix = 'spy_';
-    document.getElementById('modeSelect').style.display = 'none';
-    document.getElementById('nicknameLogin').style.display = 'flex';
-  };
-
-  document.getElementById('backBtn').onclick = backToModeSelect;
   document.getElementById('loginBtn').onclick = login;
-  document.getElementById('nicknameLoginBtn').onclick = nicknameLogin;
   document.getElementById('togglePrivateBtn').onclick = togglePrivatePanel;
   document.getElementById('resetBtn').onclick = showResetModal;
   document.getElementById('endPrivateBtn').onclick = endPrivate;
@@ -397,45 +362,27 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   document.onclick = () => quickMenu.style.display = 'none';
   setInterval(loadNewMessages, 400);
+  setInterval(checkPrivateRequest, 600);
 });
-
-function backToModeSelect() {
-  me = null; myRealId = null;
-  mode = "group"; privatePartner = null;
-  lastLoadedId = 0; loadedMessageIds.clear();
-  clearInterval(privateCheckTimer); clearInterval(privateWaitTimer); clearInterval(watchExitTimer);
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('nicknameLogin').style.display = 'none';
-  document.getElementById('modeSelect').style.display = 'flex';
-  document.getElementById('messages').innerHTML = '';
-}
 
 async function login() {
   let v = (document.getElementById('playerId').value || '1').replace(/\D/g, '');
-  v = Math.max(1, Math.min(8, v));
-  me = v + '号';
+  if (v == "9") {
+    prefix = "spy_";
+    me = "匿名";
+  } else {
+    v = Math.max(1, Math.min(8, v));
+    prefix = "room_";
+    me = v + '号';
+  }
   myRealId = prefix + me;
+
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
-  document.getElementById('togglePrivateBtn').style.display = 'inline-block';
-  document.getElementById('quickAddBtn').style.display = 'block';
+  refreshPrivatePanel();
 }
 
-async function nicknameLogin() {
-  let nickname = document.getElementById('nicknameInput').value.trim();
-  if (!nickname) { alert('请输入名字'); return; }
-  me = nickname;
-  myRealId = prefix + me;
-  document.getElementById('nicknameLogin').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('myInfo').innerText = '我是：' + me;
-  document.getElementById('togglePrivateBtn').style.display = 'none';
-  document.getElementById('quickAddBtn').style.display = 'none';
-}
-
-// =============== 修复：消息显示 + 自己/别人区分 + 气泡不拉伸 ===============
 async function loadNewMessages() {
   if (isLoading) return;
   isLoading = true;
@@ -493,7 +440,6 @@ async function send() {
   document.getElementById('msgInput').value = '';
 }
 
-// 以下私聊逻辑保持不变，已自动适配前缀
 async function sendPrivateRequest(to) {
   if (!myRealId) return;
   clearAllTimers();
@@ -539,6 +485,7 @@ async function endPrivate() {
   privatePartner = null; mode = 'group';
   document.getElementById('endPrivateBtn').style.display = 'none';
   document.getElementById('privateStatus').innerText = '';
+  refreshPrivatePanel();
 }
 
 function clearAllTimers() {

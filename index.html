@@ -267,14 +267,11 @@ let me = null;
 let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
-let lastPendingRequestId = null;
 
-// 【新增】定时器ID，用于退出时清理
-let loadMsgInterval = null;
-let checkReqInterval = null;
-let watchSentInterval = null;
-let refreshPanelInterval = null;
-let updateUiInterval = null;
+// 定时器引用
+let loadMsgTimer = null;
+let checkReqTimer = null;
+let watchPartnerExitTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -308,19 +305,16 @@ async function login() {
   await supabaseClient.from('players').upsert({
     player_id: me,
     status: 'online',
-    last_seen: new Date()
+    is_private_chat_with: null
   });
 
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
-  // 【修复】用变量保存定时器ID
-  loadMsgInterval = setInterval(loadMessages, 300);
-  checkReqInterval = setInterval(checkPrivateRequest, 400);
-  watchSentInterval = setInterval(watchMySentRequest, 400);
-  refreshPanelInterval = setInterval(refreshPrivateStatusPanel, 800);
-  updateUiInterval = setInterval(updateMyUiStatus, 800);
+  // 只启动必要的定时器
+  loadMsgTimer = setInterval(loadNewMessages, 300);
+  checkReqTimer = setInterval(checkPrivateRequest, 500);
 }
 
 function togglePrivatePanel() {
@@ -336,41 +330,21 @@ function updateMyUiStatus() {
 }
 
 async function refreshPrivateStatusPanel() {
-  const { data: users } = await supabaseClient.from('players').select('*').eq('status', 'in_private');
+  const { data: users } = await supabaseClient.from('players').select('*').not('is_private_chat_with', 'is', null);
   const listEl = document.getElementById('privateList');
   if (!users || users.length === 0) { listEl.innerText = '暂无私聊'; return; }
-  const ids = [...new Set(users.map(u => u.player_id))];
-  const pairs = [];
-  for (let i = 0; i < ids.length; i += 2) {
-    const a = ids[i];
-    const b = ids[i + 1] || '?';
-    pairs.push(`${a} ↔ ${b}`);
-  }
+  const pairs = users.map(u => `${u.player_id} ↔ ${u.is_private_chat_with}`);
   listEl.innerText = pairs.join('\n');
 }
 
-// 发起私聊：清理旧请求
 async function sendPrivateRequest(to) {
-  const { data: target } = await supabaseClient.from('players').select('status').eq('player_id', to).single();
-  if (target?.status === 'in_private') { alert(to + ' 正在私聊中'); return; }
+  const { data: target } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', to).single();
+  if (target?.is_private_chat_with) return alert(to + ' 正在私聊中');
 
-  // 清理同方向旧pending
-  await supabaseClient
-    .from('private_requests')
-    .delete()
-    .eq('from_id', me)
-    .eq('to_id', to)
-    .eq('status', 'pending');
-
-  await supabaseClient.from('private_requests').insert([{
-    from_id: me,
-    to_id: to,
-    status: 'pending'
-  }]);
+  await supabaseClient.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
   alert('已向 ' + to + ' 发起私聊申请');
 }
 
-// 被发起方查邀请
 async function checkPrivateRequest() {
   if (mode === 'private') return;
   if (document.getElementById('privateModal').style.display === 'flex') return;
@@ -383,172 +357,129 @@ async function checkPrivateRequest() {
     .order('created_at', { ascending: false })
     .limit(1);
 
-  if (!reqs || reqs.length === 0) {
-    lastPendingRequestId = null;
-    return;
-  }
-
+  if (!reqs || reqs.length === 0) return;
   const req = reqs[0];
-  if (lastPendingRequestId === req.id) return;
-
-  lastPendingRequestId = req.id;
   document.getElementById('modalText').innerText = req.from_id + ' 想和你私聊';
   document.getElementById('privateModal').style.display = 'flex';
   window.currentRequest = req;
 }
 
-// 【关键修复】发起方监听：只处理"当前最新"的accepted，且不重复触发
-async function watchMySentRequest() {
-  if (mode === 'private') return;
-
-  const { data: reqs } = await supabaseClient
-    .from('private_requests')
-    .select('*')
-    .eq('from_id', me)
-    .eq('status', 'accepted')
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (reqs && reqs.length > 0) {
-    const req = reqs[0];
-    // 【新增】同意后立即把这条请求标为closed，防止重复进入
-    await supabaseClient
-      .from('private_requests')
-      .update({ status: 'closed' })
-      .eq('id', req.id);
-
-    mode = 'private';
-    privatePartner = req.to_id;
-    document.getElementById('endPrivateBtn').style.display = 'inline-block';
-    lastLoadedId = 0;
-  }
-}
-
-// 同意私聊
 async function acceptPrivate() {
   if (!window.currentRequest) return;
   const from = window.currentRequest.from_id;
 
-  await supabaseClient.from('private_requests')
-    .update({ status: 'accepted' })
-    .eq('id', window.currentRequest.id);
+  // 双方状态同步
+  await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
+  await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
+  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.currentRequest.id);
 
-  await supabaseClient.from('players')
-    .update({ status: 'in_private' })
-    .eq('player_id', me);
-
-  await supabaseClient.from('players')
-    .update({ status: 'in_private' })
-    .eq('player_id', from);
-
+  // 进入私聊
   mode = 'private';
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
-  lastLoadedId = 0;
-  lastPendingRequestId = null;
+  updateMyUiStatus();
+
+  // 监听对方退出
+  watchPartnerExitTimer = setInterval(watchPartnerExit, 400);
 }
 
-// 拒绝私聊
 async function rejectPrivate() {
   if (!window.currentRequest) return;
-  await supabaseClient.from('private_requests')
-    .update({ status: 'rejected' })
-    .eq('id', window.currentRequest.id);
+  await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.currentRequest.id);
   document.getElementById('privateModal').style.display = 'none';
-  lastPendingRequestId = null;
 }
 
-// 【彻底修复】退出私聊：清理所有状态 + 数据库 + 定时器
+async function watchPartnerExit() {
+  if (mode !== 'private' || !privatePartner) return;
+  const { data: partner } = await supabaseClient.from('players').select('is_private_chat_with').eq('player_id', privatePartner).single();
+  if (!partner || partner.is_private_chat_with !== me) {
+    forceExitPrivate();
+  }
+}
+
 async function endPrivate() {
   if (!privatePartner) return;
-
-  // 1. 前端状态全清
-  mode = 'group';
   const exPartner = privatePartner;
-  privatePartner = null;
-  lastLoadedId = 0;
-  lastPendingRequestId = null;
-  document.getElementById('endPrivateBtn').style.display = 'none';
 
-  // 2. 数据库清理（关键！）
-  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
-  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', exPartner);
+  // 清理定时器
+  if (watchPartnerExitTimer) clearInterval(watchPartnerExitTimer);
 
-  // 3. 关闭双方所有相关私聊请求（防止循环）
-  await supabaseClient.from('private_requests')
-    .update({ status: 'closed' })
-    .or(`from_id.eq.${me},to_id.eq.${me},from_id.eq.${exPartner},to_id.eq.${exPartner}`);
+  // 同步双方退出
+  await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
+  await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', exPartner);
 
-  // 4. 强制刷新一次消息，避免闪烁
-  await loadMessages();
+  forceExitPrivate();
 }
 
-// 加载消息（稳定不闪）
-async function loadMessages() {
+function forceExitPrivate() {
+  mode = 'group';
+  privatePartner = null;
+  document.getElementById('endPrivateBtn').style.display = 'none';
+  updateMyUiStatus();
+  lastLoadedId = 0;
+}
+
+async function loadNewMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
     .select('*')
+    .gt('id', lastLoadedId)
     .order('created_at', { ascending: true });
 
-  if (!list) return;
+  if (!list || list.length === 0) return;
+
   const dom = document.getElementById('messages');
-  const oldScroll = dom.scrollHeight - dom.scrollTop; // 防闪烁
-  let maxId = 0;
-
-  // 【修复】只更新新增消息，不清空全部
-  const fragment = document.createDocumentFragment();
   for (const m of list) {
-    if (m.id <= lastLoadedId) continue;
-
-    let el;
-    if (m.type === 'system') {
-      el = document.createElement('div');
-      el.className = 'sys';
-      el.textContent = m.content;
-    } else {
-      const isMe = m.from_id === me;
-      el = document.createElement('div');
-      el.className = `msg ${isMe ? 'me' : ''}`;
-      el.innerHTML = `
-        <div class="avatar" data-id="${m.from_id}">${m.from_id.replace('号', '')}</div>
-        <div class="bubble">${m.content}</div>
-      `;
+    // 群聊只看public，私聊只看双方之间的private
+    if (mode === 'group' && m.type !== 'public') continue;
+    if (mode === 'private') {
+      if (m.type !== 'private') continue;
+      const valid = (m.from_id === me && m.to_id === privatePartner) || (m.from_id === privatePartner && m.to_id === me);
+      if (!valid) continue;
     }
-    fragment.appendChild(el);
-    if (m.id > maxId) maxId = m.id;
+
+    if (m.type === 'system') {
+      dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
+    } else {
+      const num = m.from_id.replace('号', '');
+      const isMe = m.from_id === me;
+      dom.insertAdjacentHTML('beforeend', `
+        <div class="msg ${isMe ? 'me' : ''}">
+          <div class="avatar" data-id="${m.from_id}">${num}</div>
+          <div class="bubble">${m.content}</div>
+        </div>`);
+    }
+
+    if (m.id > lastLoadedId) lastLoadedId = m.id;
   }
 
-  if (maxId > lastLoadedId) {
-    dom.appendChild(fragment);
-    lastLoadedId = maxId;
-    // 平滑滚动
-    dom.scrollTop = dom.scrollHeight;
-  }
+  dom.scrollTop = dom.scrollHeight;
 }
 
-// 发送消息
 async function send() {
   const i = document.getElementById('msgInput');
   const c = i.value.trim();
   if (!c || !me) return;
+
   await supabaseClient.from('messages').insert([{
     from_id: me,
     content: c,
     type: mode === 'group' ? 'public' : 'private',
     to_id: mode === 'group' ? 'all' : privatePartner
   }]);
+
   i.value = '';
 }
 
-// 重置
 function showResetModal() { document.getElementById('resetModal').style.display = 'flex'; }
 function closeResetModal() { document.getElementById('resetModal').style.display = 'none'; }
 
 async function confirmReset() {
   const p = document.getElementById('resetPwd').value;
   if (p !== ADMIN_PWD) return alert('密码错误');
-  if (!confirm('确定清空所有记录？')) return;
+  if (!confirm('确定清空？')) return;
+
   await supabaseClient.from('messages').delete().neq('id', 0);
   await supabaseClient.from('players').delete().neq('id', 0);
   await supabaseClient.from('private_requests').delete().neq('id', 0);

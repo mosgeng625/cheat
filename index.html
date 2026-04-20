@@ -292,7 +292,7 @@
     </div>
   </div>
   <div id="privatePanel">
-    <div id="privateList">暂无私聊</div>
+    <div id="privateList">暂无私 you</div>
   </div>
   <div id="messages"></div>
   <div id="inputArea">
@@ -352,6 +352,9 @@ let privateAcceptTimer = null;
 let privateRejectTimer = null;
 let enterPrivateAtMsgId = null;
 let isProcessingReply = false;
+
+// 发起方倒计时定时器
+let timeoutTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -420,6 +423,7 @@ async function sendPrivateRequest(to) {
     to_id: to,
     status: 'pending'
   }]);
+
   enterPrivateAtMsgId = lastLoadedId;
   mode = 'private';
   privatePartner = to;
@@ -428,17 +432,21 @@ async function sendPrivateRequest(to) {
   lastLoadedId = 0;
   loadedMessageIds.clear();
   document.getElementById('messages').innerHTML = '';
+
   let waitTime = 5;
-  let timeoutTimer = setInterval(() => {
+  timeoutTimer = setInterval(() => {
     waitTime--;
     document.getElementById('privateStatus').innerText = `（等待对方同意：${to}，${waitTime}秒）`;
     if (waitTime <= 0) {
       clearInterval(timeoutTimer);
       clearInterval(privateRejectTimer);
+      clearInterval(privateAcceptTimer);
       endPrivate();
       alert(to + ' 未响应，已退出私聊');
     }
   }, 1000);
+
+  // 监听拒绝
   privateRejectTimer = setInterval(async () => {
     const { data: req } = await supabaseClient
       .from('private_requests')
@@ -450,11 +458,29 @@ async function sendPrivateRequest(to) {
     if (req) {
       clearInterval(timeoutTimer);
       clearInterval(privateRejectTimer);
+      clearInterval(privateAcceptTimer);
       endPrivate();
       alert(to + ' 拒绝了私聊');
     }
   }, 600);
-  window.privateTimeoutTimer = timeoutTimer;
+
+  // 监听同意 ———— 这里是你原来缺失的！
+  privateAcceptTimer = setInterval(async () => {
+    const { data: req } = await supabaseClient
+      .from('private_requests')
+      .select('*')
+      .eq('from_id', me)
+      .eq('to_id', to)
+      .eq('status', 'accepted')
+      .maybeSingle();
+    if (req) {
+      // 对方同意，清空所有定时器，进入正常私聊
+      clearInterval(timeoutTimer);
+      clearInterval(privateRejectTimer);
+      clearInterval(privateAcceptTimer);
+      document.getElementById('privateStatus').innerText = `（私聊中：${to}）`;
+    }
+  }, 600);
 }
 
 async function checkPrivateRequest() {
@@ -464,7 +490,7 @@ async function checkPrivateRequest() {
     .select('*')
     .eq('to_id', me)
     .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+    .order('created_at', ascending: false)
     .limit(1);
   if (!reqs || reqs.length === 0) return;
   window.curReq = reqs[0];
@@ -500,11 +526,6 @@ async function rejectPrivate() {
 }
 
 function startPrivateChat(targetId) {
-  // 修复：同意私聊后不退出、不跳转、不断开
-  if (window.privateTimeoutTimer) {
-    clearInterval(window.privateTimeoutTimer);
-    window.privateTimeoutTimer = null;
-  }
   privatePartner = targetId;
   mode = 'private';
   lastLoadedId = 0;
@@ -517,7 +538,8 @@ function startPrivateChat(targetId) {
 async function endPrivate() {
   clearInterval(privateAcceptTimer);
   clearInterval(privateRejectTimer);
-  if (window.privateTimeoutTimer) clearInterval(window.privateTimeoutTimer);
+  if (timeoutTimer) clearInterval(timeoutTimer);
+
   mode = 'group';
   privatePartner = null;
   document.getElementById('endPrivateBtn').style.display = 'none';
@@ -525,11 +547,13 @@ async function endPrivate() {
   lastLoadedId = 0;
   loadedMessageIds.clear();
   document.getElementById('messages').innerHTML = '';
+
   const { data: allPublic } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('type', 'public')
     .order('created_at', { ascending: true });
+
   const dom = document.getElementById('messages');
   let showedTip = false;
   if (allPublic) allPublic.forEach(m => {

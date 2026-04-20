@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>终极不重复聊天</title>
+<title>🔞20岁的少年心事🔞</title>
 <style>
   * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: system-ui, sans-serif;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   body {
-    background: #111;
-    color: #fff;
+    background: #111318;
+    color: #eee;
     max-width: 500px;
     margin: 0 auto;
   }
@@ -22,31 +22,42 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 0 20px;
   }
-  .card {
-    background: #222;
-    padding: 30px;
-    border-radius: 16px;
+  .login-card {
+    background: #252a33;
+    padding: 40px 30px;
+    border-radius: 20px;
     width: 100%;
     text-align: center;
+  }
+  .login-card h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+  .login-card p {
+    color: #999;
+    margin-bottom: 20px;
   }
   #playerId {
     width: 100%;
     padding: 12px;
-    margin: 10px 0;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
-    background: #333;
+    background: #2d323d;
     color: #fff;
     text-align: center;
+    margin-bottom: 15px;
   }
-  button {
-    padding: 10px 16px;
+  #loginBtn {
+    width: 100%;
+    padding: 12px;
     background: #07c160;
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
+    font-weight: bold;
     cursor: pointer;
   }
   #app {
@@ -55,51 +66,88 @@
     flex-direction: column;
   }
   #header {
+    background: #252a33;
     padding: 14px;
-    background: #222;
     display: flex;
     justify-content: space-between;
+    align-items: center;
   }
+  #myInfo { font-weight: 500; }
+  #privateStatus {
+    color: #07c160;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  #togglePrivateBtn {
+    background: #444;
+    color: #fff;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #privatePanel {
+    background: #1d1f23;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #ccc;
+    display: none;
+    border-bottom: 1px solid #333;
+  }
+  #privateList { line-height: 1.5; }
+  .header-right { display: flex; gap: 6px; }
+  #endPrivateBtn, #resetBtn {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #endPrivateBtn { display: none; }
   #messages {
     flex: 1;
     padding: 10px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
-  .msg {
-    display: flex;
-    gap: 8px;
-    max-width: 75%;
+  .sys {
+    align-self: center;
+    background: #333;
+    color: #aaa;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
   }
-  .msg.me {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-  }
+  .msg { display: flex; gap: 8px; max-width: 75%; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
   .avatar {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     background: #555;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    font-weight: bold;
     cursor: pointer;
+    flex-shrink: 0;
   }
   .bubble {
-    background: #333;
+    background: #2d323d;
     padding: 8px 12px;
     border-radius: 8px;
+    line-height: 1.4;
   }
-  .msg.me .bubble {
-    background: #07c160;
-  }
+  .msg.me .bubble { background: #07c160; color: #fff; }
   #inputArea {
     display: flex;
     padding: 10px;
-    background: #222;
+    background: #252a33;
     gap: 8px;
   }
   #msgInput {
@@ -107,228 +155,354 @@
     padding: 10px 14px;
     border-radius: 20px;
     border: none;
-    background: #1a1a1a;
+    background: #1a1d24;
     color: #fff;
+    outline: none;
+  }
+  #sendBtn {
+    padding: 10px 16px;
+    background: #07c160;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
   }
   .modal {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 999;
     align-items: center;
     justify-content: center;
   }
   .modalBox {
-    background: #222;
-    padding: 24px;
-    border-radius: 12px;
+    background: #252a33;
+    padding: 25px;
+    border-radius: 14px;
+    width: 90%;
+    max-width: 350px;
     text-align: center;
   }
   .btnGroup {
     display: flex;
     gap: 10px;
-    margin-top: 16px;
     justify-content: center;
+    margin-top: 20px;
   }
+  .btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .ok { background: #07c160; color: #fff; }
+  .no { background: #555; color: #fff; }
 </style>
 </head>
 <body>
-
 <div id="login">
-  <div class="card">
-    <h3>输入编号（1‑8）</h3>
-    <input id="playerId" maxlength="1" placeholder="编号">
-    <button onclick="login()">进入</button>
+  <div class="login-card">
+    <h1>🔞20岁的少年心事🔞</h1>
+    <p>输入 1‑8 进入房间</p>
+    <input id="playerId" placeholder="输入编号" maxlength="1">
+    <button id="loginBtn">进入房间</button>
   </div>
 </div>
 
 <div id="app">
   <div id="header">
-    <div id="myInfo"></div>
     <div>
-      <button id="endBtn" style="background:#c93636;display:none;" onclick="endPrivate()">结束私聊</button>
+      <span id="myInfo"></span>
+      <span id="privateStatus"></span>
     </div>
+    <button id="togglePrivateBtn">展开私聊状态</button>
+    <div class="header-right">
+      <button id="resetBtn">重置</button>
+      <button id="endPrivateBtn">结束私聊</button>
+    </div>
+  </div>
+
+  <div id="privatePanel">
+    <div id="privateList">暂无私聊</div>
   </div>
 
   <div id="messages"></div>
 
   <div id="inputArea">
-    <input id="msgInput" placeholder="输入消息">
-    <button onclick="send()">发送</button>
+    <input id="msgInput" placeholder="输入消息...">
+    <button id="sendBtn">发送</button>
   </div>
 </div>
 
-<div class="modal" id="inviteModal">
+<div id="privateModal" class="modal">
   <div class="modalBox">
-    <div id="modalText"></div>
+    <h3 id="modalText"></h3>
     <div class="btnGroup">
-      <button onclick="acceptPrivate()">同意</button>
-      <button onclick="rejectPrivate()">拒绝</button>
+      <button class="btn ok" id="acceptBtn">同意</button>
+      <button class="btn no" id="rejectBtn">拒绝</button>
+    </div>
+  </div>
+</div>
+
+<div id="resetModal" class="modal">
+  <div class="modalBox">
+    <h3>重置房间</h3>
+    <input id="resetPwd" type="password" placeholder="密码" style="width:100%;padding:12px;border-radius:8px;border:none;background:#1a1d24;color:#fff;text-align:center;margin-bottom:20px">
+    <div class="btnGroup">
+      <button class="btn no" id="cancelResetBtn">取消</button>
+      <button class="btn ok" id="confirmResetBtn">确认重置</button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-const supabase = supabase.createClient(
-  "https://mronesaayjtjuhwvzouj.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY"
-);
+const SUPABASE_URL = "https://mronesaayjtjuhwvzouj.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb25lc2FheWp0anVod3Z6b3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTQ4NzUsImV4cCI6MjA5MjE5MDg3NX0.rejXofvcyx8iwDBx-8p01xAgQxqAn0KcyS5boCnWkIY";
+const ADMIN_PWD = "admin123";
 
+let supabaseClient;
 let me = null;
-let privateWith = null;
-let lastId = 0;
-let loadedIds = new Set(); // 【终极防重复：记录所有已加载消息ID】
+let mode = "group";
+let privatePartner = null;
+let lastLoadedId = 0;
+let loadedMessageIds = new Set(); // 防重复
+
+document.addEventListener('DOMContentLoaded', () => {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('togglePrivateBtn').addEventListener('click', togglePrivatePanel);
+  document.getElementById('resetBtn').addEventListener('click', showResetModal);
+  document.getElementById('endPrivateBtn').addEventListener('click', endPrivate);
+  document.getElementById('sendBtn').addEventListener('click', send);
+  document.getElementById('msgInput').addEventListener('keypress', e => { if (e.key === 'Enter') send(); });
+  document.getElementById('acceptBtn').addEventListener('click', acceptPrivate);
+  document.getElementById('rejectBtn').addEventListener('click', rejectPrivate);
+  document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
+  document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
+
+  document.getElementById('messages').addEventListener('click', e => {
+    const ava = e.target.closest('.avatar');
+    if (!ava) return;
+    const target = ava.dataset.id;
+    if (target === me) return;
+    sendPrivateRequest(target);
+  });
+});
 
 async function login() {
   let v = document.getElementById('playerId').value.trim() || '1';
-  v = v.replace(/\D/g,'');
+  v = v.replace(/\D/g, '');
   v = Math.min(8, Math.max(1, v));
   me = v + '号';
 
+  await supabaseClient.from('players').upsert({
+    player_id: me,
+    status: 'online',
+    last_seen: new Date()
+  });
+
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('myInfo').innerText = '我：' + me;
+  document.getElementById('myInfo').innerText = '我是：' + me;
 
-  setTimeout(() => {
-    setInterval(loadNewMsg, 300);
-    setInterval(watchInvite, 500);
-    setInterval(watchPartnerAccept, 500);
-    setInterval(watchPartnerQuit, 500);
-  }, 200);
+  setInterval(loadMessages, 300);
+  setInterval(checkPrivateRequest, 500);
+  setInterval(watchMySentRequest, 500);
+  setInterval(refreshPrivateStatusPanel, 800);
+  setInterval(updateMyUiStatus, 800);
 }
 
-// 【终极防重复】只加载新消息，ID 去重
-async function loadNewMsg() {
-  const { data } = await supabase
+function togglePrivatePanel() {
+  const panel = document.getElementById('privatePanel');
+  const btn = document.getElementById('togglePrivateBtn');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  btn.innerText = panel.style.display === 'block' ? '收起私聊状态' : '展开私聊状态';
+}
+
+function updateMyUiStatus() {
+  const el = document.getElementById('privateStatus');
+  el.innerText = mode === 'private' && privatePartner ? `（私聊中：${privatePartner}）` : '';
+}
+
+async function refreshPrivateStatusPanel() {
+  const { data: users } = await supabaseClient.from('players').select('*').eq('status', 'in_private');
+  const listEl = document.getElementById('privateList');
+  if (!users || users.length === 0) { listEl.innerText = '暂无私聊'; return; }
+  const ids = [...new Set(users.map(u => u.player_id))];
+  const pairs = [];
+  for (let i = 0; i < ids.length; i += 2) {
+    const a = ids[i];
+    const b = ids[i + 1] || '?';
+    pairs.push(`${a} ↔ ${b}`);
+  }
+  listEl.innerText = pairs.join('\n');
+}
+
+async function sendPrivateRequest(to) {
+  const { data: target } = await supabaseClient.from('players').select('status').eq('player_id', to).single();
+  if (target?.status === 'in_private') { alert(to + ' 正在私聊中'); return; }
+  await supabaseClient.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
+  alert('已向 ' + to + ' 发起私聊申请');
+}
+
+async function checkPrivateRequest() {
+  if (mode === 'private') return;
+  if (document.getElementById('privateModal').style.display === 'flex') return;
+
+  const { data: reqs } = await supabaseClient
+    .from('private_requests')
+    .select('*')
+    .eq('to_id', me)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (!reqs || reqs.length === 0) return;
+  const req = reqs[0];
+  document.getElementById('modalText').innerText = req.from_id + ' 想和你私聊';
+  document.getElementById('privateModal').style.display = 'flex';
+  window.currentRequest = req;
+}
+
+async function watchMySentRequest() {
+  if (mode === 'private') return;
+
+  const { data: reqs } = await supabaseClient
+    .from('private_requests')
+    .select('*')
+    .eq('from_id', me)
+    .eq('status', 'accepted')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (reqs && reqs.length > 0) {
+    const req = reqs[0];
+    mode = 'private';
+    privatePartner = req.to_id;
+    document.getElementById('endPrivateBtn').style.display = 'inline-block';
+    lastLoadedId = 0;
+    loadedMessageIds.clear();
+  }
+}
+
+async function acceptPrivate() {
+  if (!window.currentRequest) return;
+  const from = window.currentRequest.from_id;
+
+  await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.currentRequest.id);
+  await supabaseClient.from('players').update({ status: 'in_private' }).eq('player_id', me);
+  await supabaseClient.from('players').update({ status: 'in_private' }).eq('player_id', from);
+
+  mode = 'private';
+  privatePartner = from;
+  document.getElementById('endPrivateBtn').style.display = 'inline-block';
+  document.getElementById('privateModal').style.display = 'none';
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+}
+
+async function rejectPrivate() {
+  if (!window.currentRequest) return;
+  await supabaseClient.from('private_requests').update({ status: 'rejected' }).eq('id', window.currentRequest.id);
+  document.getElementById('privateModal').style.display = 'none';
+}
+
+async function endPrivate() {
+  if (!privatePartner) return;
+
+  // 清理状态
+  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', me);
+  await supabaseClient.from('players').update({ status: 'online' }).eq('player_id', privatePartner);
+
+  // 关闭所有相关请求，防止反复进入
+  await supabaseClient.from('private_requests')
+    .update({ status: 'closed' })
+    .or(`from_id.eq.${me},to_id.eq.${me},from_id.eq.${privatePartner},to_id.eq.${privatePartner}`);
+
+  mode = 'group';
+  privatePartner = null;
+  document.getElementById('endPrivateBtn').style.display = 'none';
+  lastLoadedId = 0;
+  loadedMessageIds.clear();
+}
+
+// ==============================================
+// 【真正修复：只追加新消息，绝不重复、绝不闪烁】
+// ==============================================
+async function loadMessages() {
+  const { data: list } = await supabaseClient
     .from('messages')
     .select('*')
-    .gt('id', lastId)
+    .gt('id', lastLoadedId)
     .order('id', { ascending: true });
 
-  if (!data || data.length === 0) return;
-
-  const box = document.getElementById('messages');
+  if (!list || list.length === 0) return;
+  const dom = document.getElementById('messages');
   let updated = false;
 
-  data.forEach(m => {
-    if (loadedIds.has(m.id)) return; // 绝对不重复
-    loadedIds.add(m.id);
+  for (const m of list) {
+    if (loadedMessageIds.has(m.id)) continue;
+    loadedMessageIds.add(m.id);
 
-    // 群聊 / 私聊 过滤
-    if (!privateWith && m.type !== 'public') return;
-    if (privateWith) {
-      const isMatch =
-        (m.from_id === me && m.to_id === privateWith) ||
-        (m.from_id === privateWith && m.to_id === me);
-      if (!isMatch) return;
+    // 模式过滤
+    if (mode === 'group' && m.type !== 'public') continue;
+    if (mode === 'private') {
+      const isBetween =
+        (m.from_id === me && m.to_id === privatePartner) ||
+        (m.from_id === privatePartner && m.to_id === me);
+      if (!isBetween) continue;
     }
 
-    const isMe = m.from_id === me;
-    const num = m.from_id.replace('号','');
-    box.insertAdjacentHTML('beforeend', `
+    let html = '';
+    if (m.type === 'system') {
+      html = `<div class="sys">${m.content}</div>`;
+    } else {
+      const num = m.from_id.replace('号', '');
+      const isMe = m.from_id === me;
+      html = `
       <div class="msg ${isMe ? 'me' : ''}">
         <div class="avatar" data-id="${m.from_id}">${num}</div>
         <div class="bubble">${m.content}</div>
-      </div>
-    `);
+      </div>`;
+    }
 
-    lastId = Math.max(lastId, m.id);
+    dom.insertAdjacentHTML('beforeend', html);
+    lastLoadedId = Math.max(lastLoadedId, m.id);
     updated = true;
-  });
+  }
 
-  if (updated) box.scrollTop = box.scrollHeight;
+  if (updated) dom.scrollTop = dom.scrollHeight;
 }
 
 async function send() {
   const i = document.getElementById('msgInput');
   const c = i.value.trim();
-  if (!c) return;
-  i.value = '';
+  if (!c || !me) return;
 
-  await supabase.from('messages').insert([{
+  await supabaseClient.from('messages').insert([{
     from_id: me,
     content: c,
-    type: privateWith ? 'private' : 'public',
-    to_id: privateWith || 'all'
+    type: mode === 'group' ? 'public' : 'private',
+    to_id: mode === 'group' ? 'all' : privatePartner
   }]);
+  i.value = '';
 }
 
-document.getElementById('messages').onclick = e => {
-  const ava = e.target.closest('.avatar');
-  if (!ava) return;
-  const to = ava.dataset.id;
-  if (to === me) return;
-  supabase.from('private_requests').insert([{ from_id: me, to_id: to, status: 'pending' }]);
-  alert('已发起私聊');
-};
+function showResetModal() { document.getElementById('resetModal').style.display = 'flex'; }
+function closeResetModal() { document.getElementById('resetModal').style.display = 'none'; }
 
-async function watchInvite() {
-  if (privateWith) return;
-  const { data } = await supabase
-    .from('private_requests')
-    .select('*')
-    .eq('to_id', me)
-    .eq('status', 'pending')
-    .limit(1);
-  if (!data || data.length === 0) return;
-  window.curReq = data[0];
-  document.getElementById('modalText').innerText = data[0].from_id + ' 想私聊';
-  document.getElementById('inviteModal').style.display = 'flex';
-}
-
-async function acceptPrivate() {
-  if (!window.curReq) return;
-  const from = window.curReq.from_id;
-  await supabase.from('private_requests').update({ status: 'accepted' }).eq('id', window.curReq.id);
-  privateWith = from;
-  document.getElementById('endBtn').style.display = 'inline-block';
-  document.getElementById('inviteModal').style.display = 'none';
-  lastId = 0;
-  loadedIds.clear();
-}
-
-function rejectPrivate() {
-  document.getElementById('inviteModal').style.display = 'none';
-}
-
-async function watchPartnerAccept() {
-  if (privateWith) return;
-  const { data } = await supabase
-    .from('private_requests')
-    .select('*')
-    .eq('from_id', me)
-    .eq('status', 'accepted')
-    .limit(1);
-  if (data && data.length > 0) {
-    privateWith = data[0].to_id;
-    document.getElementById('endBtn').style.display = 'inline-block';
-    lastId = 0;
-    loadedIds.clear();
-  }
-}
-
-async function endPrivate() {
-  if (!privateWith) return;
-  await supabase.from('private_requests').delete().or(
-    `from_id.eq.${me},to_id.eq.${me},from_id.eq.${privateWith},to_id.eq.${privateWith}`
-  );
-  privateWith = null;
-  document.getElementById('endBtn').style.display = 'none';
-  lastId = 0;
-  loadedIds.clear();
-}
-
-async function watchPartnerQuit() {
-  if (!privateWith) return;
-  const { data } = await supabase
-    .from('private_requests')
-    .select('*')
-    .or(`from_id.eq.${privateWith},to_id.eq.${privateWith}`);
-  if (!data || data.length === 0) {
-    privateWith = null;
-    document.getElementById('endBtn').style.display = 'none';
-  }
+async function confirmReset() {
+  const p = document.getElementById('resetPwd').value;
+  if (p !== ADMIN_PWD) return alert('密码错误');
+  if (!confirm('确定清空所有记录？')) return;
+  await supabaseClient.from('messages').delete().neq('id', 0);
+  await supabaseClient.from('players').delete().neq('id', 0);
+  await supabaseClient.from('private_requests').delete().neq('id', 0);
+  alert('重置成功');
+  location.reload();
 }
 </script>
 </body>

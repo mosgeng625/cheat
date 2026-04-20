@@ -171,7 +171,6 @@
     cursor: pointer;
   }
 
-  /* 👇 只在这里新增 加号按钮 + 快捷菜单，完全不改动你原有样式 */
   #quickAddBtn {
     width: 36px;
     height: 36px;
@@ -272,7 +271,6 @@
 
   <div id="messages"></div>
 
-  <!-- 👇 只在这里加了加号按钮，其他完全不变 -->
   <div id="inputArea">
     <button id="quickAddBtn">+</button>
     <div id="quickMenu">
@@ -323,6 +321,9 @@ let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
 
+// 👇 只加这一行，防重复核心
+let loadedMessageIds = new Set();
+
 let loadMsgTimer = null;
 let checkReqTimer = null;
 let watchPartnerExitTimer = null;
@@ -341,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
   document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
 
-  // 👇 只新增这段快捷按钮逻辑，完全不改动你原有代码
   const quickAddBtn = document.getElementById('quickAddBtn');
   const quickMenu = document.getElementById('quickMenu');
   quickAddBtn.addEventListener('click', e => {
@@ -485,8 +485,10 @@ function forceExitPrivate() {
   document.getElementById('endPrivateBtn').style.display = 'none';
   updateMyUiStatus();
   lastLoadedId = 0;
+  loadedMessageIds.clear();
 }
 
+// 👇 只修复这个函数，其他完全不动！！！
 async function loadNewMessages() {
   const { data: list } = await supabaseClient
     .from('messages')
@@ -498,6 +500,10 @@ async function loadNewMessages() {
 
   const dom = document.getElementById('messages');
   for (const m of list) {
+    // 👇 防重复：已经加载过的消息直接跳过
+    if (loadedMessageIds.has(m.id)) continue;
+    loadedMessageIds.add(m.id);
+
     if (mode === 'group' && m.type !== 'public') continue;
     if (mode === 'private') {
       if (m.type !== 'private') continue;

@@ -407,6 +407,7 @@ async function loadNewMessages() {
                    ));
       if (!show) continue;
 
+      // ✅ 修复：正确区分自己 vs 别人
       const isMe = m.from_id === myRealId;
       const showName = m.from_id.replace(prefix, '');
       const first = showName.charAt(0);
@@ -415,6 +416,7 @@ async function loadNewMessages() {
       if (m.type === 'system') {
         dom.insertAdjacentHTML('beforeend', `<div class="sys">${m.content}</div>`);
       } else {
+        // ✅ 修复：气泡样式正常、不拉伸、左右区分
         dom.insertAdjacentHTML('beforeend', `
           <div class="msg ${isMe ? 'me' : ''}">
             <div class="avatar">${first}</div>

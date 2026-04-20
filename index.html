@@ -144,11 +144,14 @@
     line-height: 1.4;
   }
   .msg.me .bubble { background: #07c160; color: #fff; }
+
+  /* 输入区样式微调，保证美观 */
   #inputArea {
     display: flex;
     padding: 10px;
     background: #252a33;
-    gap: 8px;
+    gap: 6px;
+    align-items: center;
   }
   #msgInput {
     flex: 1;
@@ -159,6 +162,23 @@
     color: #fff;
     outline: none;
   }
+  #targetSelect {
+    padding: 10px 8px;
+    border-radius: 20px;
+    border: none;
+    background: #1a1d24;
+    color: #fff;
+    outline: none;
+  }
+  #quickBtn {
+    padding: 10px 12px;
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
   #sendBtn {
     padding: 10px 16px;
     background: #07c160;
@@ -167,6 +187,7 @@
     border-radius: 20px;
     cursor: pointer;
   }
+
   .modal {
     display: none;
     position: fixed;
@@ -229,7 +250,19 @@
 
   <div id="messages"></div>
 
+  <!-- 输入区：增加下拉选择 + 快捷按钮 -->
   <div id="inputArea">
+    <select id="targetSelect">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select>
+    <button id="quickBtn">快捷：我要和X号私聊</button>
     <input id="msgInput" placeholder="输入消息...">
     <button id="sendBtn">发送</button>
   </div>
@@ -268,7 +301,6 @@ let mode = "group";
 let privatePartner = null;
 let lastLoadedId = 0;
 
-// 定时器引用
 let loadMsgTimer = null;
 let checkReqTimer = null;
 let watchPartnerExitTimer = null;
@@ -287,6 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancelResetBtn').addEventListener('click', closeResetModal);
   document.getElementById('confirmResetBtn').addEventListener('click', confirmReset);
 
+  // 快捷私聊按钮
+  document.getElementById('quickBtn').addEventListener('click', sendQuickPrivateMsg);
+
   document.getElementById('messages').addEventListener('click', e => {
     const ava = e.target.closest('.avatar');
     if (!ava) return;
@@ -295,6 +330,19 @@ document.addEventListener('DOMContentLoaded', () => {
     sendPrivateRequest(target);
   });
 });
+
+// 快捷发送：我要和 X 号私聊
+function sendQuickPrivateMsg() {
+  const target = document.getElementById('targetSelect').value;
+  const text = `我要和 ${target} 号私聊`;
+
+  supabaseClient.from('messages').insert([{
+    from_id: me,
+    content: text,
+    type: 'public',
+    to_id: 'all'
+  }]);
+}
 
 async function login() {
   let v = document.getElementById('playerId').value.trim() || '1';
@@ -312,7 +360,6 @@ async function login() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('myInfo').innerText = '我是：' + me;
 
-  // 只启动必要的定时器
   loadMsgTimer = setInterval(loadNewMessages, 300);
   checkReqTimer = setInterval(checkPrivateRequest, 500);
 }
@@ -368,19 +415,16 @@ async function acceptPrivate() {
   if (!window.currentRequest) return;
   const from = window.currentRequest.from_id;
 
-  // 双方状态同步
   await supabaseClient.from('players').update({ is_private_chat_with: from }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: me }).eq('player_id', from);
   await supabaseClient.from('private_requests').update({ status: 'accepted' }).eq('id', window.currentRequest.id);
 
-  // 进入私聊
   mode = 'private';
   privatePartner = from;
   document.getElementById('endPrivateBtn').style.display = 'inline-block';
   document.getElementById('privateModal').style.display = 'none';
   updateMyUiStatus();
 
-  // 监听对方退出
   watchPartnerExitTimer = setInterval(watchPartnerExit, 400);
 }
 
@@ -402,10 +446,8 @@ async function endPrivate() {
   if (!privatePartner) return;
   const exPartner = privatePartner;
 
-  // 清理定时器
   if (watchPartnerExitTimer) clearInterval(watchPartnerExitTimer);
 
-  // 同步双方退出
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', me);
   await supabaseClient.from('players').update({ is_private_chat_with: null }).eq('player_id', exPartner);
 
@@ -431,7 +473,6 @@ async function loadNewMessages() {
 
   const dom = document.getElementById('messages');
   for (const m of list) {
-    // 群聊只看public，私聊只看双方之间的private
     if (mode === 'group' && m.type !== 'public') continue;
     if (mode === 'private') {
       if (m.type !== 'private') continue;
